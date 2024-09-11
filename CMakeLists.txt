@@ -91,7 +91,7 @@ target_link_libraries(gas_shader_compiler PRIVATE
 )
 
 function(gas_link_hermetic_libcxx tgt)
-  if (MADRONA_WINDOWS)
+  if (WIN32)
     return()
   endif()
 

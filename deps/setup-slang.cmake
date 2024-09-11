@@ -16,7 +16,7 @@ function(fetch_build_slang)
   )
   set(FETCHCONTENT_QUIET TRUE)
 
-  if (NOT MADRONA_WINDOWS) #FIX
+  if (NOT WIN32) #FIX
     FetchContent_GetProperties(MadronaBundledToolchain)
 
     set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
@@ -85,7 +85,7 @@ index ed9e9046..d6e6728f 100644
      if (sink->getErrorCount() != 0)
 ]=])
 
-    file(WRITE "${BUNDLE_TMP_DIR}/slang-patch" "${PATCH_STR}")
+    file(CONFIGURE OUTPUT "${BUNDLE_TMP_DIR}/slang-patch" CONTENT "${PATCH_STR}" NEWLINE_STYLE UNIX)
 
     execute_process(COMMAND
       ${GIT_EXECUTABLE} checkout 

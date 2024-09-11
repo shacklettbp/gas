@@ -26,21 +26,21 @@ if (GAS_USE_DAWN)
 endif()
 
 function(add_slang_target)
-  if (MADRONA_WINDOWS)
-    find_file(SLANG_IN_LOC libslang.dll
+  if (WIN32)
+    find_file(SLANG_IN_LOC slang.dll
       PATHS "${SLANG_BUNDLED_DIR}/bin"
       REQUIRED
       NO_DEFAULT_PATH
     )
 
-    find_file(SLANG_GLSLANG_IN_LOC libslang-glslang.dll
+    find_file(SLANG_GLSLANG_IN_LOC slang-glslang.dll
       PATHS "${SLANG_BUNDLED_DIR}/bin"
       REQUIRED
       NO_DEFAULT_PATH
     )
 
     find_library(SLANG_IMPLIB_LOC
-      NAMES libslang.lib
+      NAMES slang.lib
       PATHS "${SLANG_BUNDLED_DIR}/lib"
       REQUIRED
       NO_DEFAULT_PATH
@@ -90,7 +90,7 @@ function(add_slang_target)
     ${SLANG_OUT_LOC}
   )
 
-  if (MADRONA_WINDOWS)
+  if (WIN32)
     set_target_properties(gas_slang PROPERTIES IMPORTED_IMPLIB
       ${SLANG_IMPLIB_LOC}
     )

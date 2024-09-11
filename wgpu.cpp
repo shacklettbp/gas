@@ -15,7 +15,7 @@ namespace gas::webgpu {
 
 namespace {
 
-constexpr inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
+inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
 {
   using Out = wgpu::TextureFormat;
   using enum TextureFormat;
@@ -31,8 +31,7 @@ constexpr inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
   }
 }
 
-constexpr inline TextureFormat convertWebGPUTextureFormat(
-    wgpu::TextureFormat in)
+inline TextureFormat convertWebGPUTextureFormat(wgpu::TextureFormat in)
 {
   using In = wgpu::TextureFormat;
   using enum TextureFormat;
@@ -46,7 +45,7 @@ constexpr inline TextureFormat convertWebGPUTextureFormat(
   }
 };
 
-constexpr inline wgpu::TextureUsage convertTextureUsage(TextureUsage in)
+inline wgpu::TextureUsage convertTextureUsage(TextureUsage in)
 {
   using Out = wgpu::TextureUsage;
   using enum TextureUsage;
@@ -81,8 +80,7 @@ constexpr inline wgpu::TextureUsage convertTextureUsage(TextureUsage in)
   return (Out)out;
 }
 
-constexpr inline wgpu::AddressMode convertSamplerAddressMode(
-    SamplerAddressMode in)
+inline wgpu::AddressMode convertSamplerAddressMode(SamplerAddressMode in)
 {
   using Out = wgpu::AddressMode;
   using enum SamplerAddressMode;
@@ -96,8 +94,7 @@ constexpr inline wgpu::AddressMode convertSamplerAddressMode(
   }
 }
 
-constexpr inline wgpu::FilterMode convertSamplerFilterMode(
-    SamplerFilterMode in)
+inline wgpu::FilterMode convertSamplerFilterMode(SamplerFilterMode in)
 {
   using Out = wgpu::FilterMode;
   using enum SamplerFilterMode;
@@ -109,7 +106,7 @@ constexpr inline wgpu::FilterMode convertSamplerFilterMode(
   }
 }
 
-constexpr inline wgpu::MipmapFilterMode
+inline wgpu::MipmapFilterMode
     convertSamplerFilterModeToMipFilterMode(SamplerFilterMode in)
 {
   using Out = wgpu::MipmapFilterMode;
@@ -122,7 +119,7 @@ constexpr inline wgpu::MipmapFilterMode
   }
 }
 
-constexpr inline wgpu::BufferUsage convertBufferUsage(BufferUsage in)
+inline wgpu::BufferUsage convertBufferUsage(BufferUsage in)
 {
   using Out = wgpu::BufferUsage;
   using enum BufferUsage;
@@ -157,7 +154,7 @@ constexpr inline wgpu::BufferUsage convertBufferUsage(BufferUsage in)
   return (Out)out;
 }
 
-constexpr inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
+inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
 {
   using Out = wgpu::CompareFunction;
   using enum DepthCompare;
@@ -169,7 +166,7 @@ constexpr inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
   }
 };
 
-constexpr inline wgpu::CullMode convertCullMode(CullMode in)
+inline wgpu::CullMode convertCullMode(CullMode in)
 {
   using Out = wgpu::CullMode;
   using enum CullMode;
@@ -182,7 +179,7 @@ constexpr inline wgpu::CullMode convertCullMode(CullMode in)
   }
 }
 
-constexpr inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
+inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
 {
   using Out = wgpu::LoadOp;
   using enum AttachmentLoadMode;
@@ -195,7 +192,7 @@ constexpr inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
   }
 }
 
-constexpr inline wgpu::StoreOp convertAttachmentStoreMode(
+inline wgpu::StoreOp convertAttachmentStoreMode(
     AttachmentStoreMode in)
 {
   using Out = wgpu::StoreOp;
@@ -208,7 +205,7 @@ constexpr inline wgpu::StoreOp convertAttachmentStoreMode(
   }
 }
 
-constexpr inline wgpu::ShaderStage convertShaderStage(ShaderStage in)
+inline wgpu::ShaderStage convertShaderStage(ShaderStage in)
 {
   using Out = wgpu::ShaderStage;
   using enum ShaderStage;
@@ -231,7 +228,7 @@ constexpr inline wgpu::ShaderStage convertShaderStage(ShaderStage in)
   return (Out)out;
 }
 
-constexpr inline wgpu::BufferBindingType convertBufferBindingType(
+inline wgpu::BufferBindingType convertBufferBindingType(
   BufferBindingType in)
 {
   using Out = wgpu::BufferBindingType;
