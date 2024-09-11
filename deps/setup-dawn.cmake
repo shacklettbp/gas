@@ -20,7 +20,7 @@ function(fetch_build_dawn)
   )
   set(FETCHCONTENT_QUIET TRUE)
 
-  if (NOT MADRONA_WINDOWS) #FIX
+  if (NOT WIN32) #FIX
     FetchContent_GetProperties(MadronaBundledToolchain)
 
     set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
@@ -63,7 +63,7 @@ endif()
     )
 
     # Dawn is missing a cmake option for this, the GN files just set these defines
-    set(DAWN_CXX_FLAGS "${DAWN_CXX_FLAGS} -DDAWN_ENABLE_VULKAN_VALIDATION_LAYERS=1 -DDAWN_VK_DATA_DIR='\"vulkandata\"'")
+    set(DAWN_CXX_FLAGS "${DAWN_CXX_FLAGS} -DDAWN_ENABLE_VULKAN_VALIDATION_LAYERS=1 -DDAWN_VK_DATA_DIR=\"\\\"vulkandata\\\"\"")
   endif()
 
   list(APPEND DAWN_CMAKE_ARGS
