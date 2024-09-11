@@ -70,12 +70,27 @@ index f08b4998..149c103a 100644
              }
          }
          virtual void clear() override
+diff --git a/source/slang/slang-emit.cpp b/source/slang/slang-emit.cpp
+index ed9e9046..d6e6728f 100644
+--- a/source/slang/slang-emit.cpp
++++ b/source/slang/slang-emit.cpp
+@@ -806,7 +806,7 @@ Result linkAndOptimizeIR(
+         // For some targets, we are more restrictive about what types are allowed
+         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
+         // We will check for these restrictions here.
+-        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
++        //checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+     }
+ 
+     if (sink->getErrorCount() != 0)
 ]=])
 
     file(WRITE "${BUNDLE_TMP_DIR}/slang-patch" "${PATCH_STR}")
 
     execute_process(COMMAND
-      ${GIT_EXECUTABLE} checkout "source/core/slang-performance-profiler.cpp"
+      ${GIT_EXECUTABLE} checkout 
+          "source/core/slang-performance-profiler.cpp"
+          "source/slang/slang-emit.cpp"
       WORKING_DIRECTORY "${SLANG_SRC_DIR}"
       COMMAND_ERROR_IS_FATAL ANY
     )

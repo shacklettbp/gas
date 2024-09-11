@@ -311,7 +311,6 @@ GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
   }
 
   wgpu::Instance instance = wgpu::CreateInstance(&inst_desc);
-
   auto *api = new WebGPUAPI();
   api->inst = std::move(instance);
   api->destroyingDevice = nullptr;

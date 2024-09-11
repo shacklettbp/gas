@@ -342,7 +342,7 @@ bool WindowManager::processEvents()
   return should_quit;
 }
 
-GPUAPI * WindowManagerAPI()
+GPUAPI * WindowManager::gpuAPI()
 {
   return impl_->gpuAPI;
 }

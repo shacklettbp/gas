@@ -1,7 +1,24 @@
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-if (NOT CMAKE_PROJECT_NAME)
-  include(gas-setup-standalone)
+if (NOT PROJECT_NAME)
+  cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
+  cmake_policy(VERSION 3.30)
+  
+  set(GAS_MADRONA_DIR "" CACHE STRING "Directory containing madrona")
+  
+  if (NOT GAS_MADRONA_DIR)
+    message(FATAL_ERROR "Must set GAS_MADRONA_DIR")
+  endif()
+  
+  include("${GAS_MADRONA_DIR}/cmake/madrona_init.cmake")
+  
+  project(gas LANGUAGES C CXX OBJC)
+  
+  include(setup)
+  include(dependencies)
+  
+  SET(MADRONA_ENABLE_TESTS TRUE)
+  add_subdirectory("${GAS_MADRONA_DIR}" madrona-standalone)
 endif()
 
 add_subdirectory(deps)
@@ -17,7 +34,7 @@ list(APPEND GAS_CORE_SOURCES
 )
 
 if (GAS_USE_DAWN)
-  list(APPEND GAS_SOURCES
+  list(APPEND GAS_CORE_SOURCES
     wgpu.hpp wgpu.cpp wgpu_init.hpp
   )
 endif()
@@ -35,11 +52,11 @@ target_include_directories(gas_core PUBLIC
 )
 
 if (GAS_USE_DAWN)
-  target_link_libraries( PRIVATE
+  target_link_libraries(gas_core PRIVATE
     dawn::webgpu_dawn
   )
 
-  target_compile_definitions( PRIVATE
+  target_compile_definitions(gas_core PRIVATE
     GAS_SUPPORT_WEBGPU=1
   )
 endif()
@@ -48,8 +65,8 @@ add_library(gas_gui STATIC
   gui.hpp gui.inl gui.cpp
 )
 
-target_link_libraries(gas_gui PUBLIC
-  gas_core
+target_link_libraries(gas_gui PRIVATE
+  gas_core madrona_common
 )
 
 if (GAS_USE_SDL)
