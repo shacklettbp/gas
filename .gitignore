@@ -1,0 +1,9 @@
+/build
+/.vs
+/CMakeSettings.json
+/deps/bundle-tmp
+/deps/bundled-sdl
+/deps/sdl-src
+/deps/dawn-src
+/deps/bundled-dawn
+/deps/bundled-slang
