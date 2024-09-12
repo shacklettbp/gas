@@ -68,7 +68,7 @@ public:
 
 extern "C" {
 
-#ifdef gas_core_shader_compiler_EXPORTS
+#ifdef gas_shader_compiler_EXPORTS
 #define GAS_SHADER_COMPILER_VIS MADRONA_EXPORT
 #else
 #define GAS_SHADER_COMPILER_VIS MADRONA_IMPORT
@@ -76,7 +76,8 @@ extern "C" {
 GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler *
     gasCreateShaderCompiler();
 
-GAS_SHADER_COMPILER_VIS void gasShaderCompilerLibCleanup();
+GAS_SHADER_COMPILER_VIS void gasStartupShaderCompilerLib();
+GAS_SHADER_COMPILER_VIS void gasShutdownShaderCompilerLib();
 
 #undef GAS_SHADER_COMPILER_VIS
 

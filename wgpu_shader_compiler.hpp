@@ -20,3 +20,5 @@ GAS_TINT_VIZ bool tintConvertSPIRVToWGSL(
     void **out_wgsl, int64_t *out_num_bytes, char **out_diagnostics);
                         
 }
+
+#undef GAS_TINT_VIZ

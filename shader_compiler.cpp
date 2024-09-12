@@ -439,16 +439,25 @@ ShaderCompileResult CompilerBackend::compileShader(
 
 extern "C" {
 
-::gas::ShaderCompiler * gasCreateShaderCompiler()
+#ifdef gas_shader_compiler_EXPORTS
+#define GAS_SHADER_COMPILER_VIS MADRONA_EXPORT
+#else
+#define GAS_SHADER_COMPILER_VIS MADRONA_IMPORT
+#endif
+
+GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler * gasCreateShaderCompiler()
+{
+  return ::gas::CompilerBackend::init();
+}
+
+GAS_SHADER_COMPILER_VIS void gasStartupShaderCompilerLib()
 {
 #ifdef GAS_SUPPORT_WEBGPU
   ::gas::webgpu::tintInit();
 #endif
-
-  return ::gas::CompilerBackend::init();
 }
 
-void gasShaderCompilerLibCleanup()
+GAS_SHADER_COMPILER_VIS void gasShutdownShaderCompilerLib()
 {
   slang::shutdown();
 
@@ -456,5 +465,7 @@ void gasShaderCompilerLibCleanup()
   ::gas::webgpu::tintShutdown();
 #endif
 }
+
+#undef GAS_SHADER_COMPILER_VIS
 
 }

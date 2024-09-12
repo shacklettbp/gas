@@ -189,11 +189,21 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
     FATAL("Failed to load shader compiler library: %u", GetLastError());
   }
 
+  auto startup_fn = (void (*)())GetProcAddress(
+      handle, "gasStartupShaderCompilerLib");
+
+  if (!startup_fn) {
+    FATAL("Failed to find startup function in shader compiler library: %u",
+          GetLastError());
+  }
+
+  startup_fn();
+
   auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
       handle, "gasCreateShaderCompiler");
 
   if (!create_fn) {
-    FATAL("Failed to find init function in shader compiler library: %u",
+    FATAL("Failed to find create function in shader compiler library: %u",
           GetLastError());
   }
 
@@ -210,10 +220,20 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
     FATAL("Failed to load shader compiler library: %s", dlerror());
   }
 
+  auto startup_fn = (void (*)())dlsym(
+      handle, "gasStartupShaderCompilerLib");
+
+  if (!startup_fn) {
+    FATAL("Failed to find startup function in shader compiler library: %s",
+          dlerror());
+  }
+
+  startup_fn();
+
   auto create_fn = (ShaderCompiler * (*)())dlsym(
       lib, "gasCreateShaderCompiler");
   if (!create_fn) {
-    FATAL("Failed to find init function in shader compiler library: %s",
+    FATAL("Failed to find create function in shader compiler library: %s",
           dlerror());
   }
 
@@ -226,24 +246,24 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
 void GPUAPI::unloadShaderCompiler(ShaderCompilerLib compiler_lib)
 {
 #if defined(MADRONA_WINDOWS)
-  auto cleanup_fn = (void (*)())GetProcAddress(
-      compiler_lib.hdl, "gasShaderCompilerLibCleanup");
-  if (!cleanup_fn) {
-    FATAL("Failed to cleanup shader compiler: %u", GetLastError());
+  auto shutdown_fn = (void (*)())GetProcAddress(
+      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+  if (!shutdown_fn) {
+    FATAL("Failed to shutdown shader compiler: %u", GetLastError());
   }
 
-  cleanup_fn();
+  shutdown_fn();
   if (!FreeLibrary(compiler_lib.hdl)) {
     FATAL("Failed to unload shader compiler library: %u", GetLastError());
   }
 #elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
-  auto cleanup_fn = (void (*)())dlsym(
-      compiler_lib.hdl, "gasShaderCompilerLibCleanup");
-  if (!cleanup_fn) {
-    FATAL("Failed to cleanup shader compiler: %s", dlerror());
+  auto shutdown_fn = (void (*)())dlsym(
+      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+  if (!shutdown_fn) {
+    FATAL("Failed to shutdown shader compiler: %s", dlerror());
   }
 
-  cleanup_fn();
+  shutdown_fn();
   dlclose(compiler_lib.hdl);
 #else
   (void)compiler_lib;
