@@ -221,7 +221,7 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
   }
 
   auto startup_fn = (void (*)())dlsym(
-      handle, "gasStartupShaderCompilerLib");
+      lib, "gasStartupShaderCompilerLib");
 
   if (!startup_fn) {
     FATAL("Failed to find startup function in shader compiler library: %s",

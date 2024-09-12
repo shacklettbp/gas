@@ -58,7 +58,7 @@ GAS_TINT_VIZ TintConvertStatus tintConvertSPIRVToWGSL(
       tint_prog, tint::wgsl::writer::Options {});
   
   if (tint_wgsl != tint::Success) {
-    writeWGSLProgToDiagnostics;
+    writeWGSLProgToDiagnostics();
     return TintConvertStatus::WGSLOutputError;
   }
   
