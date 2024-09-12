@@ -15,6 +15,10 @@
 #include "linux.hpp"
 #endif
 
+#if defined(SDL_PLATFORM_WIN32)
+#include "windows.hpp"
+#endif
+
 #endif
 
 #include "init.hpp"
@@ -225,6 +229,24 @@ static void initWindow(PlatformWindow *window_out,
 
   Surface surface =
     gpu_api->createSurface(ca_layer, width * 2, height * 2);
+#elif defined(SDL_PLATFORM_WIN32)
+  void *hinstance = SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_hdl),
+      SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, NULL);
+  void *hwnd = SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_hdl),
+      SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+  if (!hinstance || !hwnd) {
+    FATAL("Failed to get WIN32 window handles from SDL");
+  }
+
+  Win32WindowHandle win32_hdl {
+    .hinstance = hinstance,
+    .hwnd = hwnd,
+  };
+
+  Surface surface =
+    gpu_api->createSurface(&win32_hdl, width, height);
+#else
+  static_assert(false, "Unimplemented");
 #endif
 
   REQ_SDL(SDL_SetPointerProperty(window_props, "gas_hdl", window_out));

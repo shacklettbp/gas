@@ -23,14 +23,14 @@ endif()
 
 add_subdirectory(deps)
 
-include(gas-setup-deps)
+include(gas-find-deps)
 
 list(APPEND GAS_CORE_SOURCES
   gas.hpp gas.inl gas.cpp
   backend_common.hpp 
   init.hpp init.cpp
   mem.hpp mem.cpp
-  linux.hpp
+  linux.hpp windows.hpp
 )
 
 if (GAS_USE_DAWN)
@@ -52,13 +52,7 @@ target_include_directories(gas_core PUBLIC
 )
 
 if (GAS_USE_DAWN)
-  target_link_libraries(gas_core PRIVATE
-    dawn::webgpu_dawn
-  )
-
-  target_compile_definitions(gas_core PRIVATE
-    GAS_SUPPORT_WEBGPU=1
-  )
+  target_link_libraries(gas_core PRIVATE gas_dawn)
 endif()
 
 add_library(gas_gui STATIC
@@ -70,13 +64,7 @@ target_link_libraries(gas_gui PRIVATE
 )
 
 if (GAS_USE_SDL)
-  target_link_libraries(gas_gui PRIVATE
-    SDL3::SDL3
-  )
-
-  target_compile_definitions(gas_gui PRIVATE
-    GAS_USE_SDL=1
-  )
+  target_link_libraries(gas_gui PRIVATE gas_sdl)
 endif()
 
 add_library(gas_shader_compiler SHARED
@@ -110,9 +98,7 @@ endfunction()
 gas_link_hermetic_libcxx(gas_shader_compiler)
 
 if (GAS_USE_DAWN)
-  target_link_libraries(gas_shader_compiler PRIVATE
-    dawn::webgpu_dawn
-  )
+  target_link_libraries(gas_shader_compiler PRIVATE gas_dawn)
 
   target_compile_definitions(gas_shader_compiler PRIVATE
     GAS_SUPPORT_WEBGPU=1

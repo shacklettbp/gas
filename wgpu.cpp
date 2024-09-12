@@ -9,6 +9,10 @@
 #include "linux.hpp"
 #endif
 
+#ifdef MADRONA_WINDOWS
+#include "windows.hpp"
+#endif
+
 //#define GAS_WGPU_DEBUG_PRINT (1)
 
 namespace gas::webgpu {
@@ -323,11 +327,10 @@ void WebGPUAPI::shutdown()
 Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
 {
 #if defined(MADRONA_LINUX)
-
   LinuxWindowHandle &linux_hdl = *(LinuxWindowHandle *)os_data;
 
-  wgpu::SurfaceDescriptorFromXlibWindow from_xlib;
-  wgpu::SurfaceDescriptorFromWaylandSurface from_wayland;
+  wgpu::SurfaceSourceXlibWindow from_xlib;
+  wgpu::SurfaceSourceWaylandSurface from_wayland;
   wgpu::SurfaceDescriptor surface_desc;
 
   switch (linux_hdl.backend) {
@@ -352,7 +355,7 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
     default: MADRONA_UNREACHABLE();
   }
 #elif defined(MADRONA_MACOS)
-  wgpu::SurfaceDescriptorFromMetalLayer from_metal({
+  wgpu::SurfaceSourceMetalLayer from_metal({
     .nextInChain = nullptr,
     .layer = os_data,
   });
@@ -361,6 +364,21 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
     .nextInChain = &from_metal,
     .label = nullptr,
   };
+#elif defined(MADRONA_WINDOWS)
+  Win32WindowHandle &win32_hdl = *(Win32WindowHandle *)os_data;
+
+  wgpu::SurfaceSourceWindowsHWND from_windows_hwnd({
+    .nextInChain = nullptr,
+    .hinstance = win32_hdl.hinstance,
+    .hwnd = win32_hdl.hwnd,
+  });
+  
+  wgpu::SurfaceDescriptor surface_desc {
+    .nextInChain = &from_windows_hwnd,
+    .label = nullptr,
+  };
+#else
+  static_assert(false, "Unimplemented");
 #endif
 
   wgpu::Surface surface = inst.CreateSurface(&surface_desc);

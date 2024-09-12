@@ -1,5 +1,3 @@
-#include <unistd.h>
-
 #include "gui.hpp"
 #include "shader_compiler.hpp"
 

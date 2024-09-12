@@ -51,10 +51,8 @@ endif()
   if (WIN32)
     list(APPEND DAWN_CMAKE_ARGS
       "-DDAWN_ENABLE_D3D11=OFF"
-      "-DDAWN_ENABLE_D3D12=OFF"
+      "-DDAWN_ENABLE_D3D12=ON"
     )
-
-    set(DAWN_USE_VULKAN ON)
   endif()
 
   if (DAWN_USE_VULKAN)
@@ -64,6 +62,10 @@ endif()
 
     # Dawn is missing a cmake option for this, the GN files just set these defines
     set(DAWN_CXX_FLAGS "${DAWN_CXX_FLAGS} -DDAWN_ENABLE_VULKAN_VALIDATION_LAYERS=1 -DDAWN_VK_DATA_DIR=\"\\\"vulkandata\\\"\"")
+  else()
+    list(APPEND DAWN_CMAKE_ARGS
+      "-DDAWN_ENABLE_VULKAN=OFF"
+    )
   endif()
 
   list(APPEND DAWN_CMAKE_ARGS
@@ -99,6 +101,35 @@ endif()
     execute_process(COMMAND ${Python_EXECUTABLE}
       "${DAWN_SRC_DIR}/tools/fetch_dawn_dependencies.py"
       WORKING_DIRECTORY "${DAWN_SRC_DIR}"
+    )
+
+file(CONFIGURE OUTPUT "${BUNDLE_TMP_DIR}/dawn-patch" NEWLINE_STYLE UNIX @ONLY CONTENT
+[=[diff --git a/src/tint/CMakeLists.txt b/src/tint/CMakeLists.txt
+index 61f4f4d2d4..041e30eff6 100644
+--- a/src/tint/CMakeLists.txt
++++ b/src/tint/CMakeLists.txt
+@@ -731,4 +731,8 @@ if (TINT_ENABLE_INSTALL)
+       get_filename_component(TINT_HEADER_DIR ${TINT_HEADER_FILE} DIRECTORY)
+       install(FILES ${TINT_ROOT_SOURCE_DIR}/${TINT_HEADER_FILE}  DESTINATION  ${CMAKE_INSTALL_INCLUDEDIR}/src/tint/${TINT_HEADER_DIR})
+   endforeach ()
++
++  if (WIN32)
++    install(TARGETS SPIRV-Tools-static SPIRV-Tools-opt DESTINATION ${CMAKE_INSTALL_LIBDIR})
++  endif()
+ endif()
+]=])
+
+    execute_process(COMMAND
+      ${GIT_EXECUTABLE} checkout 
+          "src/tint/CMakeLists.txt"
+      WORKING_DIRECTORY "${DAWN_SRC_DIR}"
+      COMMAND_ERROR_IS_FATAL ANY
+    )
+
+    execute_process(COMMAND
+      ${GIT_EXECUTABLE} apply "${BUNDLE_TMP_DIR}/dawn-patch"
+      WORKING_DIRECTORY "${DAWN_SRC_DIR}"
+      COMMAND_ERROR_IS_FATAL ANY
     )
 
     # Need to update abseil to fix a macos bug
