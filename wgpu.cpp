@@ -905,6 +905,7 @@ void Backend::createParamBlockTypes(
         case DepthTexture2D: {
           sample_type = wgpu::TextureSampleType::Depth;
           tex_dim = wgpu::TextureViewDimension::e2D;
+        default: MADRONA_UNREACHABLE();
         } break;
       }
 
@@ -1599,7 +1600,7 @@ GPUAPI * initWebGPU(GPULib *lib, const APIConfig &cfg)
 {
   (void)lib;
 
-  printf("%lu\n", sizeof(Backend));
+  printf("%zu\n", sizeof(Backend));
 
   return WebGPUAPI::init(cfg);
 }

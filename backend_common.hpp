@@ -41,6 +41,8 @@ struct ResourceTable {
   union ColdDataAndFreeList {
     Cold data;
     TableAllocator::Node freeNode;
+
+    ~ColdDataAndFreeList() {};
   };
 
   struct Uninit {};
