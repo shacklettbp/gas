@@ -101,15 +101,32 @@ function(find_dawn)
     set_target_properties(gas_dawn_shlib PROPERTIES IMPORTED_IMPLIB
       ${DAWN_IMPLIB}
     )
+  endif()
 
+  add_library(gas_dawn_tint_libs INTERFACE)
+  target_include_directories(gas_dawn_tint_libs SYSTEM INTERFACE
+    ${DAWN_BUNDLED_DIR}/include/src/tint
+  )
+
+  if (WIN32)
     cmake_path(GET DAWN_IMPLIB PARENT_PATH DAWN_IMPLIB_DIR)
 
-    file(GLOB TINT_LIBS "${DAWN_IMPLIB_DIR}/tint_*.lib")
+    file(GLOB TINT_LIBS "${DAWN_IMPLIB_DIR}/tint*.lib")
 
-    target_link_libraries(gas_dawn INTERFACE
+    target_link_libraries(gas_dawn_tint_libs INTERFACE
       ${TINT_LIBS}
       ${DAWN_IMPLIB_DIR}/SPIRV-Tools-opt.lib
       ${DAWN_IMPLIB_DIR}/SPIRV-Tools.lib
+    )
+  else()
+    cmake_path(GET DAWN_IN_LOC PARENT_PATH DAWN_LIB_DIR)
+
+    file(GLOB TINT_LIBS "${DAWN_LIB_DIR}/libtint*.a")
+
+    target_link_libraries(gas_dawn_tint_libs INTERFACE
+      ${TINT_LIBS}
+      ${DAWN_LIB_DIR}/libSPIRV-Tools-opt.a
+      ${DAWN_LIB_DIR}/libSPIRV-Tools.a
     )
   endif()
 endfunction()

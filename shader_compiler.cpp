@@ -5,14 +5,8 @@
 #include <slang.h>
 
 #ifdef GAS_SUPPORT_WEBGPU
-#include <tint/tint.h>
-#include <src/tint/lang/core/ir/module.h>
-#include <src/tint/lang/spirv/reader/reader.h>
-#include <src/tint/lang/wgsl/writer/writer.h>
-#include <vector>
+#include "wgpu_shader_compiler.hpp"
 #endif
-
-#include <fstream>
 
 using namespace slang;
 
@@ -305,6 +299,8 @@ Span<const ParamBlockTypeInit> reflectParameterBlocksForTarget(
 ShaderParamBlockReflectionResult CompilerBackend::paramBlockReflection(
     StackAlloc &alloc, ShaderCompileArgs args)
 {
+  (void)alloc;
+  (void)args;
   return {};
 
 #if 0
@@ -388,7 +384,7 @@ ShaderCompileResult CompilerBackend::compileShader(
     IBlob *blob;
     REQ_SLANG(request->getTargetCodeBlob(tgt_idx, &blob));
 
-    size_t num_bytes = blob->getBufferSize();
+    i64 num_bytes = (i64)blob->getBufferSize();
     void *dst = alloc.allocN<char>(num_bytes);
     memcpy(dst, blob->getBufferPointer(), num_bytes);
     blob->release();
@@ -410,32 +406,27 @@ ShaderCompileResult CompilerBackend::compileShader(
 
   if (request_cfg.wgslOut) {
     assert(request_cfg.spirvIDX != -1);
-    ShaderByteCode spirv_bytecode = out.spirv;
 
-    assert(spirv_bytecode.numBytes % 4 == 0);
-    std::vector<uint32_t> tint_input(spirv_bytecode.numBytes / 4);
-    memcpy(tint_input.data(), spirv_bytecode.data, spirv_bytecode.numBytes);
+    auto alloc_wrapper = [](void *to_stack_alloc, i64 num_bytes) {
+      StackAlloc &alloc = *(StackAlloc *)to_stack_alloc;
+      return alloc.alloc(num_bytes, 1);
+    };
 
-    tint::Program tint_prog = tint::spirv::reader::Read(tint_input);
+    void *wgsl_out;
+    i64 num_wgsl_bytes;
+    char *wgsl_diagnostics;
+    bool success = webgpu::tintConvertSPIRVToWGSL(
+        out.spirv.data, out.spirv.numBytes,
+        alloc_wrapper, &alloc, 
+        &wgsl_out, &num_wgsl_bytes, &wgsl_diagnostics);
 
-    if (tint_prog.Diagnostics().ContainsErrors()) {
-      printf("%s\n", tint::Program::printer(tint_prog).c_str());
-      FATAL("Tint failed to read SPIRV: %s",
-            tint_prog.Diagnostics().Str().c_str());
+    if (!success) {
+      out.success = false;
+      // FIXME
+      fprintf(stderr, "%s\n", wgsl_diagnostics);
+    } else {
+      out.wgsl = { wgsl_out, num_wgsl_bytes};
     }
-
-    auto tint_wgsl = tint::wgsl::writer::Generate(
-        tint_prog, tint::wgsl::writer::Options {});
-
-    if (tint_wgsl != tint::Success) {
-      FATAL("Tint failed to output WGSL");
-    }
-
-    size_t num_bytes = tint_wgsl->wgsl.size();
-    void *dst = alloc.allocN<char>(num_bytes);
-    memcpy(dst, tint_wgsl->wgsl.data(), num_bytes);
-
-    out.wgsl = { dst, num_bytes };
   }
 
   request->release();
@@ -451,7 +442,7 @@ extern "C" {
 ::gas::ShaderCompiler * gasCreateShaderCompiler()
 {
 #ifdef GAS_SUPPORT_WEBGPU
-  tint::Initialize();
+  ::gas::webgpu::tintInit();
 #endif
 
   return ::gas::CompilerBackend::init();
@@ -462,7 +453,7 @@ void gasShaderCompilerLibCleanup()
   slang::shutdown();
 
 #ifdef GAS_SUPPORT_WEBGPU
-  tint::Shutdown();
+  ::gas::webgpu::tintShutdown();
 #endif
 }
 

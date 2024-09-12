@@ -344,8 +344,8 @@ enum class ShaderByteCodeType : u32 {
 };
 
 struct ShaderByteCode {
-  const void *data;
-  uint64_t numBytes;
+  void *data;
+  int64_t numBytes;
 };
 
 enum class DepthCompare : u16 {

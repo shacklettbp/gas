@@ -105,17 +105,15 @@ endif()
 
 file(CONFIGURE OUTPUT "${BUNDLE_TMP_DIR}/dawn-patch" NEWLINE_STYLE UNIX @ONLY CONTENT
 [=[diff --git a/src/tint/CMakeLists.txt b/src/tint/CMakeLists.txt
-index 61f4f4d2d4..041e30eff6 100644
+index 61f4f4d2d4..43b18c1eef 100644
 --- a/src/tint/CMakeLists.txt
 +++ b/src/tint/CMakeLists.txt
-@@ -731,4 +731,8 @@ if (TINT_ENABLE_INSTALL)
+@@ -731,4 +731,6 @@ if (TINT_ENABLE_INSTALL)
        get_filename_component(TINT_HEADER_DIR ${TINT_HEADER_FILE} DIRECTORY)
        install(FILES ${TINT_ROOT_SOURCE_DIR}/${TINT_HEADER_FILE}  DESTINATION  ${CMAKE_INSTALL_INCLUDEDIR}/src/tint/${TINT_HEADER_DIR})
    endforeach ()
 +
-+  if (WIN32)
-+    install(TARGETS SPIRV-Tools-static SPIRV-Tools-opt DESTINATION ${CMAKE_INSTALL_LIBDIR})
-+  endif()
++  install(TARGETS SPIRV-Tools-static SPIRV-Tools-opt DESTINATION ${CMAKE_INSTALL_LIBDIR})
  endif()
 ]=])
 

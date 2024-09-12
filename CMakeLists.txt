@@ -1,8 +1,8 @@
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if (NOT PROJECT_NAME)
-  cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
-  cmake_policy(VERSION 3.30)
+  cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
+  cmake_policy(VERSION 3.26)
   
   set(GAS_MADRONA_DIR "" CACHE STRING "Directory containing madrona")
   
@@ -11,8 +11,13 @@ if (NOT PROJECT_NAME)
   endif()
   
   include("${GAS_MADRONA_DIR}/cmake/madrona_init.cmake")
-  
-  project(gas LANGUAGES C CXX OBJC)
+
+  list(APPEND LANGS C CXX)
+  if (APPLE)
+    list(APPEND LANGS OBJC)
+  endif()
+
+  project(gas LANGUAGES ${LANGS})
   
   include(setup)
   include(dependencies)
@@ -72,10 +77,7 @@ add_library(gas_shader_compiler SHARED
 )
 target_link_libraries(gas_shader_compiler PRIVATE
   gas_slang
-  madrona_hdrs
-  madrona_mem
-  madrona_noexceptrtti
-  madrona_err
+  madrona_common
 )
 
 function(gas_link_hermetic_libcxx tgt)
@@ -95,18 +97,26 @@ function(gas_link_hermetic_libcxx tgt)
     ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a )
 endfunction()
 
-gas_link_hermetic_libcxx(gas_shader_compiler)
-
 if (GAS_USE_DAWN)
-  target_link_libraries(gas_shader_compiler PRIVATE gas_dawn)
-
-  target_compile_definitions(gas_shader_compiler PRIVATE
-    GAS_SUPPORT_WEBGPU=1
+  add_library(gas_dawn_tint SHARED
+    wgpu_shader_compiler.hpp
+    wgpu_shader_compiler.cpp
+  )
+  target_link_libraries(gas_dawn_tint PRIVATE 
+    madrona_hdrs
+    madrona_noexceptrtti
+    gas_dawn
+    gas_dawn_tint_libs
   )
 
-  target_include_directories(gas_shader_compiler SYSTEM PRIVATE
-    ${DAWN_BUNDLED_DIR}/include/src/tint
-  )
+  if (WIN32)
+    set_property(TARGET gas_dawn_tint PROPERTY
+      MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  else()
+    gas_link_hermetic_libcxx(gas_dawn_tint)
+  endif()
+
+  target_link_libraries(gas_shader_compiler PRIVATE gas_dawn gas_dawn_tint)
 endif()
 
 add_executable(gas_frontend
