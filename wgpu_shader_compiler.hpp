@@ -11,13 +11,19 @@
 
 namespace gas::webgpu {
 
+enum class TintConvertStatus {
+  Success,
+  SPIRVConvertError,
+  WGSLOutputError,
+};
+
 GAS_TINT_VIZ void tintInit();
 GAS_TINT_VIZ void tintShutdown();
 
-GAS_TINT_VIZ bool tintConvertSPIRVToWGSL(
+GAS_TINT_VIZ TintConvertStatus tintConvertSPIRVToWGSL(
     void *spirv_bytecode, int64_t num_bytes,
     void *(*alloc_fn)(void *alloc_data, int64_t num_bytes), void *alloc_data,
-    void **out_wgsl, int64_t *out_num_bytes, char **out_diagnostics);
+    char **out_wgsl, int64_t *out_num_bytes, char **out_diagnostics);
                         
 }
 

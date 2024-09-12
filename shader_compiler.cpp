@@ -412,15 +412,15 @@ ShaderCompileResult CompilerBackend::compileShader(
       return alloc.alloc(num_bytes, 1);
     };
 
-    void *wgsl_out;
+    char *wgsl_out;
     i64 num_wgsl_bytes;
     char *wgsl_diagnostics;
-    bool success = webgpu::tintConvertSPIRVToWGSL(
+    webgpu::TintConvertStatus status = webgpu::tintConvertSPIRVToWGSL(
         out.spirv.data, out.spirv.numBytes,
         alloc_wrapper, &alloc, 
         &wgsl_out, &num_wgsl_bytes, &wgsl_diagnostics);
 
-    if (!success) {
+    if (status != webgpu::TintConvertStatus::Success) {
       out.success = false;
       // FIXME
       fprintf(stderr, "%s\n", wgsl_diagnostics);
