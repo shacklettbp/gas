@@ -18,7 +18,7 @@ if (NOT PROJECT_NAME)
   include(dependencies)
   
   SET(MADRONA_ENABLE_TESTS TRUE)
-  add_subdirectory("${GAS_MADRONA_DIR}" madrona-standalone)
+  add_subdirectory("${GAS_MADRONA_DIR}" madrona-standalone EXCLUDE_FROM_ALL)
 endif()
 
 add_subdirectory(deps)

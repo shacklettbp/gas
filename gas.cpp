@@ -179,7 +179,24 @@ void BackendCommon::reportError(ErrorStatus error)
 ShaderCompilerLib GPUAPI::loadShaderCompiler()
 {
 #if defined(MADRONA_WINDOWS)
-  FATAL("Unimplemented");
+  const char *lib_name = "gas_shader_compiler.dll";
+
+  void *handle = LoadLibraryExA(
+      lib_name, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+  if (!module_handle) {
+    FATAL("Failed to load shader compiler library: %u", GetLastError());
+  }
+
+  auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
+      module_handle, "gasCreateShaderCompiler"));
+
+  if (!create_fn) {
+    FATAL("Failed to find init function in shader compiler library: %u",
+          GetLastError());
+  }
+
+  // Return the handle and the create function
+  return { handle, create_fn };
 #elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
 #ifdef MADRONA_LINUX
   const char *lib_name = "libgas_shader_compiler.so";
@@ -207,12 +224,21 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
 void GPUAPI::unloadShaderCompiler(ShaderCompilerLib compiler_lib)
 {
 #if defined(MADRONA_WINDOWS)
-  FATAL("Unimplemented");
+  auto cleanup_fn = (void (*)())GetProcAddress(
+      compiler_lib.hdl, "gasShaderCompilerLibCleanup");
+  if (!cleanup_fn) {
+    FATAL("Failed to cleanup shader compiler: %u", GetLastError());
+  }
+
+  cleanup_fn();
+  if (!FreeLibrary(module_handle)) {
+    FATAL("Failed to unload shader compiler library: %u", GetLastError());
+  }
 #elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
   auto cleanup_fn = (void (*)())dlsym(
       compiler_lib.hdl, "gasShaderCompilerLibCleanup");
   if (!cleanup_fn) {
-    FATAL("Failed to cleanup shader compiler", dlerror());
+    FATAL("Failed to cleanup shader compiler: %s", dlerror());
   }
 
   cleanup_fn();
