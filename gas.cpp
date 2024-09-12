@@ -6,6 +6,8 @@
 
 #if defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
 #include <dlfcn.h>
+#elif defined(MADRONA_WINDOWS)
+#include "windows.hpp"
 #endif
 
 namespace gas {
@@ -183,12 +185,12 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
 
   void *handle = LoadLibraryExA(
       lib_name, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
-  if (!module_handle) {
+  if (!handle) {
     FATAL("Failed to load shader compiler library: %u", GetLastError());
   }
 
   auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
-      module_handle, "gasCreateShaderCompiler"));
+      handle, "gasCreateShaderCompiler");
 
   if (!create_fn) {
     FATAL("Failed to find init function in shader compiler library: %u",
@@ -231,7 +233,7 @@ void GPUAPI::unloadShaderCompiler(ShaderCompilerLib compiler_lib)
   }
 
   cleanup_fn();
-  if (!FreeLibrary(module_handle)) {
+  if (!FreeLibrary(compiler_lib.hdl)) {
     FATAL("Failed to unload shader compiler library: %u", GetLastError());
   }
 #elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
