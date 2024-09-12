@@ -19,6 +19,11 @@ namespace gas::webgpu {
 
 namespace {
 
+struct InitDeviceResult {
+  wgpu::Adapter adapter;
+  wgpu::Device device;
+};
+
 inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
 {
   using Out = wgpu::TextureFormat;
@@ -293,6 +298,22 @@ void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
 
 }
 
+BackendTmpCmdAlloc::BackendTmpCmdAlloc()
+  : CommandTemporaryAllocator(nullptr, 0, 128 * 1024 * 1024)
+{
+}
+
+void BackendTmpCmdAlloc::destroy()
+{
+  CommandTemporaryAllocator::destroy();
+}
+
+i32 BackendTmpCmdAlloc::getNewGPUInputBlock(void **block_ptr)
+{
+  *block_ptr = nullptr;
+  return 0;
+}
+
 GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
 {
   wgpu::InstanceDescriptor inst_desc {
@@ -395,13 +416,6 @@ void WebGPUAPI::destroySurface(Surface surface)
 {
   wgpuSurfaceRelease((WGPUSurface)surface.hdl.ptr);
 } 
-
-namespace {
-struct InitDeviceResult {
-  wgpu::Adapter adapter;
-  wgpu::Device device;
-};
-}
 
 static InitDeviceResult initDevice(
   WebGPUAPI *api, i32 idx, Span<const Surface> surfaces)
@@ -1403,10 +1417,21 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
   to_cold->texture = nullptr;
 }
 
+CommandTemporaryAllocator * Backend::createCommandTmpAllocator()
+{
+  return new BackendTmpCmdAlloc {};
+}
+
+void Backend::destroyCommandTmpAllocator(CommandTemporaryAllocator *alloc)
+{
+  auto wgpu_alloc = static_cast<BackendTmpCmdAlloc *>(alloc);
+  wgpu_alloc->destroy();
+  delete wgpu_alloc;
+}
+
 void Backend::waitForIdle()
 {
 }
-
 
 void Backend::submit(FrontendCommands *frontend_cmds)
 {
@@ -1540,9 +1565,7 @@ void Backend::submit(FrontendCommands *frontend_cmds)
     pass_enc.End();
   };
 
-  while (!decoder.done()) {
-    CommandCtrl ctrl = decoder.ctrl();
-
+  for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
     switch (ctrl) {
       case CommandCtrl::RasterPass: {
         encodeRasterPass();

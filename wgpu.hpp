@@ -73,6 +73,14 @@ struct BackendRasterPass {
 
 struct NoMetadata {};
 
+class BackendTmpCmdAlloc : public CommandTemporaryAllocator {
+public:
+  inline BackendTmpCmdAlloc();
+  inline void destroy();
+
+  i32 getNewGPUInputBlock(void **block_ptr) final;
+};
+
 class WebGPUAPI final : public GPUAPI {
 public:
   wgpu::Instance inst;
@@ -246,6 +254,9 @@ public:
   void destroySwapchain(Swapchain swapchain) final;
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;
   void presentSwapchainImage(Swapchain swapchain) final;
+
+  CommandTemporaryAllocator * createCommandTmpAllocator() final; 
+  void destroyCommandTmpAllocator(CommandTemporaryAllocator *alloc) final;
 
   void waitForIdle() final;
 

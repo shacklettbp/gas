@@ -8,6 +8,7 @@
 
 namespace gas {
 
+class CommandTemporaryAllocator;
 class RasterPassEncoder;
 class ComputePassEncoder;
 class CopyPassEncoder;
@@ -411,13 +412,6 @@ struct SwapchainProperties {
 
 constexpr inline u32 TABLE_FULL = 0xFFFF'FFFF;
 
-// Used by backends
-struct FrontendCommands {
-  std::array<u32, 1024 - 3> data;
-  i32 offset;
-  FrontendCommands *next;
-};
-
 enum class CommandCtrl : u32 {
   None                = 0,
   RasterPass          = 1 << 0,
@@ -540,16 +534,77 @@ struct CopyCommand {
   inline CopyCommand();
 };
 
-struct CommandWriter {
-  inline void val(u32 v);
+// Used by backends
+struct FrontendCommands {
+  std::array<u32, 1024 - 2> data;
+  FrontendCommands *next;
+};
+
+static_assert(sizeof(FrontendCommands) == 4096);
+
+class CommandWriter {
+public:
+  inline void writeU32(u32 v);
 
   template <typename T>
   inline void id(T id);
-
   inline void ctrl(CommandCtrl ctrl);
 
-  StackAlloc *alloc;
-  FrontendCommands *cmds;
+  inline void copyState(CommandWriter o);
+
+private:
+  inline CommandWriter(CommandTemporaryAllocator *alloc,
+                       FrontendCommands *cmds);
+
+  CommandTemporaryAllocator *alloc_;
+  FrontendCommands *cmds_;
+  u32 offset_;
+
+friend class CommandTemporaryAllocator;
+friend class CommandEncoder;
+};
+
+class GPUTemporaryInputAllocator
+{
+public:
+  inline void * alloc(u32 num_bytes, u32 alignment);
+  inline i32 getNewBlock(u32 num_init_alloc_bytes, void **init_ptr);
+
+  inline void copyState(GPUTemporaryInputAllocator o);
+
+private:
+  inline GPUTemporaryInputAllocator(CommandTemporaryAllocator *alloc,
+                                    char *ptr, u32 offset, u32 block_size);
+
+  CommandTemporaryAllocator *alloc_;
+  char *ptr_;
+  u32 offset_;
+  u32 block_size_;
+
+friend class CommandTemporaryAllocator;
+};
+
+class CommandTemporaryAllocator {
+public:
+  FrontendCommands * getNewCommandBlock();
+  virtual i32 getNewGPUInputBlock(void **init_ptr) = 0;
+
+  inline CommandWriter initCommandWriter();
+  inline GPUTemporaryInputAllocator initGPUInputAlloc();
+
+protected:
+  CommandTemporaryAllocator(char *start_gpu_input_ptr,
+                            u32 start_gpu_input_offset,
+                            u32 gpu_input_block_size);
+
+  void destroy();
+
+  FrontendCommands *cmds_start_;
+  FrontendCommands *cmds_cur_;
+
+  char *start_gpu_input_ptr_;
+  u32 start_gpu_input_offset_;
+  u32 gpu_input_block_size_;
 };
 
 class RasterPassEncoder {
@@ -626,7 +681,7 @@ public:
   inline void endCopyPass(CopyPassEncoder &copy_enc);
 
 private:
-  inline CommandEncoder(StackAlloc &alloc);
+  inline CommandEncoder(CommandTemporaryAllocator *alloc);
 
   CommandWriter cmd_writer_;
   FrontendCommands *cmds_head_;
@@ -711,7 +766,7 @@ public:
                               Sampler *handles_out) = 0;
   virtual void destroySamplers(i32 num_samplers, Sampler *samplers) = 0;
 
-  // ==== Create & destroy bind groups ========================================
+  // ==== Create & destroy parameter blocks ===================================
   inline ParamBlockType createParamBlockType(
       ParamBlockTypeInit init);
   inline void destroyParamBlockType(ParamBlockType blk_type);
@@ -768,7 +823,11 @@ public:
       = 0;
 
   // ==== Command recording & submission ======================================
-  inline CommandEncoder createCommandEncoder(StackAlloc &alloc);
+  virtual CommandTemporaryAllocator * createCommandTmpAllocator() = 0;
+  virtual void destroyCommandTmpAllocator(
+      CommandTemporaryAllocator *alloc) = 0;
+
+  inline CommandEncoder createCommandEncoder(CommandTemporaryAllocator *alloc);
 
   inline void submit(CommandEncoder &enc);
   virtual void waitForIdle() = 0;

@@ -414,8 +414,6 @@ public:
       draw_params_()
   {}
 
-  inline bool done() { return cmds_ == nullptr || offset_ == cmds_->offset; }
-
   inline CommandCtrl ctrl() { return (CommandCtrl)next(); }
 
   template <typename T>
@@ -546,5 +544,7 @@ public:
   u32 errorStatus;
   bool errorsAreFatal;
 };
+
+
 
 }
