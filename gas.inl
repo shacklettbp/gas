@@ -75,41 +75,27 @@ Texture Swapchain::proxyAttachment() const
   return Texture { .gen = 0, .id = (u16)id };
 }
 
-template <typename T>
-void CommandWriter::id(T t)
-{
-  writeU32(t.uint());
-}
-
-void CommandWriter::ctrl(CommandCtrl ctrl)
-{
-  writeU32((u32)ctrl);
-}
-
-void CommandWriter::copyState(CommandWriter o)
-{
-  cmds_ = o.cmds_;
-  offset_ = o.offset_;
-}
-
-
-CommandWriter::CommandWriter(CommandAllocator *alloc,
-                             FrontendCommands *cmds)
-  : alloc_(alloc),
-    cmds_(cmds),
-    offset_(0)
-{}
-
-void CommandWriter::writeU32(uint32_t v)
+void CommandWriter::writeU32(CommandAllocator *alloc, uint32_t v)
 {
   if ((size_t)offset_ == cmds_->data.size()) [[unlikely]] {
-    cmds_ = alloc_->getNewCommandBlock();
+    cmds_ = alloc->getNewCommandBlock();
   }
 
   cmds_->data[offset_++] = v;
 }
 
-void * GPUTemporaryInputAllocator::alloc(u32 num_bytes, u32 alignment)
+template <typename T>
+void CommandWriter::id(CommandAllocator *alloc, T t)
+{
+  writeU32(alloc, t.uint());
+}
+
+void CommandWriter::ctrl(CommandAllocator *alloc, CommandCtrl ctrl)
+{
+  writeU32(alloc, (u32)ctrl);
+}
+
+void * CommandInputGPUAllocator::alloc(u32 num_bytes, u32 alignment)
 {
   u32 start = utils::roundUpPow2(offset_, alignment);
   u32 end = start + num_bytes;
@@ -122,43 +108,15 @@ void * GPUTemporaryInputAllocator::alloc(u32 num_bytes, u32 alignment)
   return ptr_ + start;
 }
 
-i32 GPUTemporaryInputAllocator::getNewBlock(
-    u32 num_init_alloc_bytes, void **init_ptr)
+i32 CommandInputGPUAllocator::getNewBlock(
+    CommandAllocator *alloc, u32 num_init_alloc_bytes, void **init_ptr)
 {
-  i32 block_idx = alloc_->getNewGPUInputBlock(init_ptr);
+  i32 block_idx = alloc->getNewGPUInputBlock(init_ptr);
 
   ptr_ = (char *)*init_ptr;
   offset_ = num_init_alloc_bytes;
 
   return block_idx;
-}
-
-void GPUTemporaryInputAllocator::copyState(GPUTemporaryInputAllocator o)
-{
-  ptr_ = o.ptr_;
-  offset_ = o.offset_;
-}
-
-
-GPUTemporaryInputAllocator::GPUTemporaryInputAllocator(
-      CommandAllocator *alloc,
-      char *ptr, u32 offset, u32 block_size)
-  : alloc_(alloc),
-    ptr_(ptr),
-    offset_(offset),
-    block_size_(block_size)
-{}
-
-CommandWriter CommandAllocator::initCommandWriter()
-{
-  return CommandWriter(this, cmds_start_);
-}
-
-GPUTemporaryInputAllocator CommandAllocator::initGPUInputAlloc()
-{
-  return GPUTemporaryInputAllocator(
-      this, start_gpu_input_ptr_, start_gpu_input_offset_,
-      gpu_input_block_size_);
 }
 
 void RasterPassEncoder::setShader(RasterShader shader)
@@ -258,57 +216,61 @@ void RasterPassEncoder::encodeDraw(
 
   ctrl_ |= draw_type;
 
-  writer_.ctrl(ctrl_);
+  writer_.ctrl(alloc_, ctrl_);
 
   if ((ctrl_ & DrawShader) != None) {
-    writer_.id(state_.shader);
+    writer_.id(alloc_, state_.shader);
   }
 
   if ((ctrl_ & DrawParamBlock0) != None) {
-    writer_.id(state_.paramBlocks[0]);
+    writer_.id(alloc_, state_.paramBlocks[0]);
   }
 
   if ((ctrl_ & DrawParamBlock1) != None) {
-    writer_.id(state_.paramBlocks[1]);
+    writer_.id(alloc_, state_.paramBlocks[1]);
   }
 
   if ((ctrl_ & DrawParamBlock2) != None) {
-    writer_.id(state_.paramBlocks[2]);
+    writer_.id(alloc_, state_.paramBlocks[2]);
   }
 
   if ((ctrl_ & DrawDynamicOffsets0) != None) {
-    writer_.writeU32(state_.dynamicBufferOffsets[0]);
+    writer_.writeU32(alloc_, state_.dynamicBufferOffsets[0]);
   }
 
   if ((ctrl_ & DrawDynamicOffsets1) != None) {
-    writer_.writeU32(state_.dynamicBufferOffsets[1]);
+    writer_.writeU32(alloc_, state_.dynamicBufferOffsets[1]);
   }
 
   if ((ctrl_ & DrawIndexOffset) != None) {
-    writer_.writeU32(state_.indexOffset);
+    writer_.writeU32(alloc_, state_.indexOffset);
   }
 
   if ((ctrl_ & DrawNumTriangles) != None) {
-    writer_.writeU32(state_.numTriangles);
+    writer_.writeU32(alloc_, state_.numTriangles);
   }
 
   if ((ctrl_ & DrawVertexOffset) != None) {
-    writer_.writeU32(state_.vertexOffset);
+    writer_.writeU32(alloc_, state_.vertexOffset);
   }
 
   if ((ctrl_ & DrawInstanceOffset) != None) {
-    writer_.writeU32(state_.instanceOffset);
+    writer_.writeU32(alloc_, state_.instanceOffset);
   }
 
   if ((ctrl_ & DrawNumInstances) != None) {
-    writer_.writeU32(state_.numInstances);
+    writer_.writeU32(alloc_, state_.numInstances);
   }
 
   ctrl_ = None;
 }
 
-RasterPassEncoder::RasterPassEncoder(CommandWriter writer)
-  : writer_(writer),
+RasterPassEncoder::RasterPassEncoder(CommandAllocator *alloc,
+                                     CommandWriter writer,
+                                     CommandInputGPUAllocator gpu_input)
+  : alloc_(alloc),
+    writer_(writer),
+    gpu_input_(gpu_input),
     ctrl_(CommandCtrl::None),
     state_()
 {}
@@ -350,26 +312,26 @@ void CopyPassEncoder::copyBufferToBuffer(Buffer src, Buffer dst,
 
   ctrl_ |= CopyBufferToBuffer;
 
-  writer_.ctrl(ctrl_);
+  writer_.ctrl(alloc_, ctrl_);
 
   if ((ctrl_ & CopyB2BSrcBuffer) != None) {
-    writer_.id(state_.b2b.src);
+    writer_.id(alloc_, state_.b2b.src);
   }
 
   if ((ctrl_ & CopyB2BDstBuffer) != None) {
-    writer_.id(state_.b2b.dst);
+    writer_.id(alloc_, state_.b2b.dst);
   }
 
   if ((ctrl_ & CopyB2BSrcOffset) != None) {
-    writer_.writeU32(state_.b2b.srcOffset);
+    writer_.writeU32(alloc_, state_.b2b.srcOffset);
   }
 
   if ((ctrl_ & CopyB2BDstOffset) != None) {
-    writer_.writeU32(state_.b2b.dstOffset);
+    writer_.writeU32(alloc_, state_.b2b.dstOffset);
   }
 
   if ((ctrl_ & CopyB2BNumBytes) != None) {
-    writer_.writeU32(state_.b2b.numBytes);
+    writer_.writeU32(alloc_, state_.b2b.numBytes);
   }
 
   ctrl_ = None;
@@ -407,22 +369,22 @@ void CopyPassEncoder::copyBufferToTexture(Buffer src,
 
   ctrl_ |= CopyBufferToTexture;
 
-  writer_.ctrl(ctrl_);
+  writer_.ctrl(alloc_, ctrl_);
 
   if ((ctrl_ & CopyB2TSrcBuffer) != None) {
-    writer_.id(state_.b2t.src);
+    writer_.id(alloc_, state_.b2t.src);
   }
 
   if ((ctrl_ & CopyB2TDstTexture) != None) {
-    writer_.id(state_.b2t.dst);
+    writer_.id(alloc_, state_.b2t.dst);
   }
 
   if ((ctrl_ & CopyB2TSrcOffset) != None) {
-    writer_.writeU32(state_.b2t.srcOffset);
+    writer_.writeU32(alloc_, state_.b2t.srcOffset);
   }
 
   if ((ctrl_ & CopyB2TDstMipSlice) != None) {
-    writer_.writeU32(state_.b2t.dstMipSlice);
+    writer_.writeU32(alloc_, state_.b2t.dstMipSlice);
   }
 
   ctrl_ = None;
@@ -459,22 +421,22 @@ void CopyPassEncoder::copyTextureToBuffer(Texture src, Buffer dst,
 
   ctrl_ |= CopyBufferToTexture;
 
-  writer_.ctrl(ctrl_);
+  writer_.ctrl(alloc_, ctrl_);
 
   if ((ctrl_ & CopyT2BSrcTexture) != None) {
-    writer_.id(state_.t2b.src);
+    writer_.id(alloc_, state_.t2b.src);
   }
 
   if ((ctrl_ & CopyT2BDstBuffer) != None) {
-    writer_.id(state_.t2b.dst);
+    writer_.id(alloc_, state_.t2b.dst);
   }
 
   if ((ctrl_ & CopyT2BSrcMipSlice) != None) {
-    writer_.writeU32(state_.t2b.srcMipSlice);
+    writer_.writeU32(alloc_, state_.t2b.srcMipSlice);
   }
 
   if ((ctrl_ & CopyT2BDstOffset) != None) {
-    writer_.writeU32(state_.t2b.dstOffset);
+    writer_.writeU32(alloc_, state_.t2b.dstOffset);
   }
 
   ctrl_ = None;
@@ -507,29 +469,30 @@ void CopyPassEncoder::fillBuffer(Buffer buffer, u32 offset,
 
   ctrl_ |= CopyBufferFill;
 
-  writer_.ctrl(ctrl_);
+  writer_.ctrl(alloc_, ctrl_);
 
   if ((ctrl_ & CopyFillBuffer) != None) {
-    writer_.id(state_.fill.buffer);
+    writer_.id(alloc_, state_.fill.buffer);
   }
 
   if ((ctrl_ & CopyFillOffset) != None) {
-    writer_.writeU32(state_.fill.offset);
+    writer_.writeU32(alloc_, state_.fill.offset);
   }
 
   if ((ctrl_ & CopyFillNumBytes) != None) {
-    writer_.writeU32(state_.fill.numBytes);
+    writer_.writeU32(alloc_, state_.fill.numBytes);
   }
 
   if ((ctrl_ & CopyFillValue) != None) {
-    writer_.writeU32(state_.fill.value);
+    writer_.writeU32(alloc_, state_.fill.value);
   }
 
   ctrl_ = None;
 }
 
-CopyPassEncoder::CopyPassEncoder(CommandWriter writer)
-  : writer_(writer),
+CopyPassEncoder::CopyPassEncoder(CommandAllocator *alloc, CommandWriter writer)
+  : alloc_(alloc),
+    writer_(writer),
     ctrl_(CommandCtrl::None),
     state_()
 {}
@@ -537,16 +500,16 @@ CopyPassEncoder::CopyPassEncoder(CommandWriter writer)
 RasterPassEncoder CommandEncoder::beginRasterPass(
   RasterPass render_pass)
 {
-  cmd_writer_.ctrl(CommandCtrl::RasterPass);
-  cmd_writer_.id(render_pass);
+  cmd_writer_.ctrl(alloc_, CommandCtrl::RasterPass);
+  cmd_writer_.id(alloc_, render_pass);
 
-  return RasterPassEncoder(cmd_writer_);
+  return RasterPassEncoder(alloc_, cmd_writer_, gpu_input_);
 }
 
 void CommandEncoder::endRasterPass(RasterPassEncoder &render_enc)
 {
-  cmd_writer_.copyState(render_enc.writer_);
-  cmd_writer_.ctrl(CommandCtrl::None);
+  cmd_writer_ = render_enc.writer_;
+  cmd_writer_.ctrl(alloc_, CommandCtrl::None);
 }
 
 ComputePassEncoder CommandEncoder::beginComputePass()
@@ -561,20 +524,24 @@ void CommandEncoder::endComputePass(ComputePassEncoder &compute_enc)
 
 CopyPassEncoder CommandEncoder::beginCopyPass()
 {
-  cmd_writer_.ctrl(CommandCtrl::CopyPass);
-  return CopyPassEncoder(cmd_writer_);
+  cmd_writer_.ctrl(alloc_, CommandCtrl::CopyPass);
+  return CopyPassEncoder(alloc_, cmd_writer_);
 }
 
 void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
 {
-  cmd_writer_.copyState(copy_enc.writer_);
-  cmd_writer_.ctrl(CommandCtrl::CopyPass);
+  cmd_writer_ = copy_enc.writer_;
+  cmd_writer_.ctrl(alloc_, CommandCtrl::CopyPass);
 }
 
 CommandEncoder::CommandEncoder(CommandAllocator *alloc)
-  : cmd_writer_(alloc->initCommandWriter()),
-    cmds_head_(cmd_writer_.cmds_)
-{}
+  : alloc_(alloc),
+    cmds_head_(nullptr),
+    cmd_writer_(),
+    gpu_input_()
+{
+  gpu_input_.block_size_ = alloc_->gpu_input_block_size_;
+}
 
 Buffer GPURuntime::createBuffer(BufferInit init,
                                 TransferQueue tx_queue)
@@ -727,15 +694,30 @@ void GPURuntime::destroyRasterShader(RasterShader shader)
   destroyRasterShaders(1, &shader);
 }
 
-CommandEncoder GPURuntime::createCommandEncoder(
-    CommandAllocator *alloc)
+CommandEncoder GPURuntime::createCommandEncoder()
 {
-  return CommandEncoder(alloc);
+  return CommandEncoder(createCommandAllocator());
+}
+
+void GPURuntime::destroyCommandEncoder(CommandEncoder encoder)
+{
+  destroyCommandAllocator(encoder.alloc_);
+}
+
+void GPURuntime::record(CommandEncoder &enc)
+{
+  enc.cmds_head_ = enc.alloc_->cmds_start_;
+
+  enc.cmd_writer_.cmds_ = enc.alloc_->cmds_start_;
+  enc.cmd_writer_.offset_ = 0;
+
+  enc.gpu_input_.ptr_ = enc.alloc_->start_gpu_input_ptr_;
+  enc.gpu_input_.offset_ = enc.alloc_->start_gpu_input_offset_;
 }
 
 void GPURuntime::submit(CommandEncoder &enc)
 {
-  enc.cmd_writer_.ctrl(CommandCtrl::None);
+  enc.cmd_writer_.ctrl(enc.alloc_, CommandCtrl::None);
   submit(enc.cmds_head_);
 }
 

@@ -1417,6 +1417,10 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
   to_cold->texture = nullptr;
 }
 
+void Backend::waitForIdle()
+{
+}
+
 CommandAllocator * Backend::createCommandAllocator()
 {
   return new CommandAllocatorBackend {};
@@ -1427,10 +1431,6 @@ void Backend::destroyCommandAllocator(CommandAllocator *alloc)
   auto wgpu_alloc = static_cast<CommandAllocatorBackend *>(alloc);
   wgpu_alloc->destroy();
   delete wgpu_alloc;
-}
-
-void Backend::waitForIdle()
-{
 }
 
 void Backend::submit(FrontendCommands *frontend_cmds)

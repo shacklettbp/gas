@@ -544,44 +544,34 @@ static_assert(sizeof(FrontendCommands) == 4096);
 
 class CommandWriter {
 public:
-  inline void writeU32(u32 v);
+  inline void writeU32(CommandAllocator *alloc, u32 v);
 
   template <typename T>
-  inline void id(T id);
-  inline void ctrl(CommandCtrl ctrl);
-
-  inline void copyState(CommandWriter o);
+  inline void id(CommandAllocator *alloc, T id);
+  inline void ctrl(CommandAllocator *alloc, CommandCtrl ctrl);
 
 private:
-  inline CommandWriter(CommandAllocator *alloc,
-                       FrontendCommands *cmds);
-
-  CommandAllocator *alloc_;
   FrontendCommands *cmds_;
   u32 offset_;
 
-friend class CommandAllocator;
 friend class CommandEncoder;
+friend class GPURuntime;
 };
 
-class GPUTemporaryInputAllocator
+class CommandInputGPUAllocator
 {
 public:
   inline void * alloc(u32 num_bytes, u32 alignment);
-  inline i32 getNewBlock(u32 num_init_alloc_bytes, void **init_ptr);
-
-  inline void copyState(GPUTemporaryInputAllocator o);
+  inline i32 getNewBlock(
+      CommandAllocator *alloc, u32 num_init_alloc_bytes, void **init_ptr);
 
 private:
-  inline GPUTemporaryInputAllocator(CommandAllocator *alloc,
-                                    char *ptr, u32 offset, u32 block_size);
-
-  CommandAllocator *alloc_;
   char *ptr_;
   u32 offset_;
   u32 block_size_;
 
-friend class CommandAllocator;
+friend class CommandEncoder;
+friend class GPURuntime;
 };
 
 class CommandAllocator {
@@ -589,13 +579,10 @@ public:
   FrontendCommands * getNewCommandBlock();
   virtual i32 getNewGPUInputBlock(void **init_ptr) = 0;
 
-  inline CommandWriter initCommandWriter();
-  inline GPUTemporaryInputAllocator initGPUInputAlloc();
-
 protected:
   CommandAllocator(char *start_gpu_input_ptr,
-                            u32 start_gpu_input_offset,
-                            u32 gpu_input_block_size);
+                   u32 start_gpu_input_offset,
+                   u32 gpu_input_block_size);
 
   void destroy();
 
@@ -605,6 +592,9 @@ protected:
   char *start_gpu_input_ptr_;
   u32 start_gpu_input_offset_;
   u32 gpu_input_block_size_;
+
+friend class CommandEncoder;
+friend class GPURuntime;
 };
 
 class RasterPassEncoder {
@@ -628,9 +618,13 @@ private:
                          u32 index_offset, u32 num_triangles,
                          u32 instance_offset, u32 num_instances);
 
-  inline RasterPassEncoder(CommandWriter writer);
+  inline RasterPassEncoder(CommandAllocator *alloc,
+                           CommandWriter writer,
+                           CommandInputGPUAllocator gpu_input);
 
+  CommandAllocator *alloc_;
   CommandWriter writer_;
+  CommandInputGPUAllocator gpu_input_;
   CommandCtrl ctrl_;
   DrawCommand state_;
 
@@ -660,8 +654,9 @@ public:
   inline void fillBuffer(Buffer buffer, u32 offset, u32 num_bytes, u32 v);
 
 private:
-  inline CopyPassEncoder(CommandWriter writer);
+  inline CopyPassEncoder(CommandAllocator *alloc, CommandWriter writer);
 
+  CommandAllocator *alloc_;
   CommandWriter writer_;
   CommandCtrl ctrl_;
   CopyCommand state_;
@@ -683,8 +678,10 @@ public:
 private:
   inline CommandEncoder(CommandAllocator *alloc);
 
-  CommandWriter cmd_writer_;
+  CommandAllocator *alloc_;
   FrontendCommands *cmds_head_;
+  CommandWriter cmd_writer_;
+  CommandInputGPUAllocator gpu_input_;
 
 friend class GPURuntime;
 };
@@ -823,11 +820,10 @@ public:
       = 0;
 
   // ==== Command recording & submission ======================================
-  virtual CommandAllocator * createCommandAllocator() = 0;
-  virtual void destroyCommandAllocator(CommandAllocator *alloc) = 0;
+  inline CommandEncoder createCommandEncoder();
+  inline void destroyCommandEncoder(CommandEncoder encoder);
 
-  inline CommandEncoder createCommandEncoder(CommandAllocator *alloc);
-
+  inline void record(CommandEncoder &enc);
   inline void submit(CommandEncoder &enc);
   virtual void waitForIdle() = 0;
 
@@ -842,6 +838,9 @@ public:
   ErrorStatus currentErrorStatus();
 
 protected:
+  virtual CommandAllocator * createCommandAllocator() = 0;
+  virtual void destroyCommandAllocator(CommandAllocator *alloc) = 0;
+
   virtual void submit(FrontendCommands *frontend_cmds) = 0;
 };
 

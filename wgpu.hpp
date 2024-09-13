@@ -255,9 +255,6 @@ public:
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;
   void presentSwapchainImage(Swapchain swapchain) final;
 
-  CommandAllocator * createCommandAllocator() final; 
-  void destroyCommandAllocator(CommandAllocator *alloc) final;
-
   void waitForIdle() final;
 
   inline BackendRasterPassConfig * getRasterPassConfigByID(
@@ -267,6 +264,8 @@ public:
       ParamBlockTypeID id);
 
 protected:
+  CommandAllocator * createCommandAllocator() final; 
+  void destroyCommandAllocator(CommandAllocator *alloc) final;
   void submit(FrontendCommands *frontend_cmds) final;
 };
 
