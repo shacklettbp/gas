@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
     .colorAttachments = { swapchain.proxyAttachment() },
   });
 
-  CommandTemporaryAllocator *cmd_alloc = gpu->createCommandTmpAllocator();
+  CommandEncodeAllocator *cmd_alloc = gpu->createCommandTmpAllocator();
   while (true) {
     {
       bool should_exit = wm.processEvents();

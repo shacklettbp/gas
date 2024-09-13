@@ -298,17 +298,17 @@ void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
 
 }
 
-BackendTmpCmdAlloc::BackendTmpCmdAlloc()
-  : CommandTemporaryAllocator(nullptr, 0, 128 * 1024 * 1024)
+EncodeAllocBackend::EncodeAllocBackend()
+  : CommandEncodeAllocator(nullptr, 0, 128 * 1024 * 1024)
 {
 }
 
-void BackendTmpCmdAlloc::destroy()
+void EncodeAllocBackend::destroy()
 {
-  CommandTemporaryAllocator::destroy();
+  CommandEncodeAllocator::destroy();
 }
 
-i32 BackendTmpCmdAlloc::getNewGPUInputBlock(void **block_ptr)
+i32 EncodeAllocBackend::getNewGPUInputBlock(void **block_ptr)
 {
   *block_ptr = nullptr;
   return 0;
@@ -1417,14 +1417,14 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
   to_cold->texture = nullptr;
 }
 
-CommandTemporaryAllocator * Backend::createCommandTmpAllocator()
+CommandEncodeAllocator * Backend::createCommandTmpAllocator()
 {
-  return new BackendTmpCmdAlloc {};
+  return new EncodeAllocBackend {};
 }
 
-void Backend::destroyCommandTmpAllocator(CommandTemporaryAllocator *alloc)
+void Backend::destroyCommandTmpAllocator(CommandEncodeAllocator *alloc)
 {
-  auto wgpu_alloc = static_cast<BackendTmpCmdAlloc *>(alloc);
+  auto wgpu_alloc = static_cast<EncodeAllocBackend *>(alloc);
   wgpu_alloc->destroy();
   delete wgpu_alloc;
 }

@@ -8,7 +8,7 @@
 
 namespace gas {
 
-class CommandTemporaryAllocator;
+class CommandEncodeAllocator;
 class RasterPassEncoder;
 class ComputePassEncoder;
 class CopyPassEncoder;
@@ -553,14 +553,14 @@ public:
   inline void copyState(CommandWriter o);
 
 private:
-  inline CommandWriter(CommandTemporaryAllocator *alloc,
+  inline CommandWriter(CommandEncodeAllocator *alloc,
                        FrontendCommands *cmds);
 
-  CommandTemporaryAllocator *alloc_;
+  CommandEncodeAllocator *alloc_;
   FrontendCommands *cmds_;
   u32 offset_;
 
-friend class CommandTemporaryAllocator;
+friend class CommandEncodeAllocator;
 friend class CommandEncoder;
 };
 
@@ -573,18 +573,18 @@ public:
   inline void copyState(GPUTemporaryInputAllocator o);
 
 private:
-  inline GPUTemporaryInputAllocator(CommandTemporaryAllocator *alloc,
+  inline GPUTemporaryInputAllocator(CommandEncodeAllocator *alloc,
                                     char *ptr, u32 offset, u32 block_size);
 
-  CommandTemporaryAllocator *alloc_;
+  CommandEncodeAllocator *alloc_;
   char *ptr_;
   u32 offset_;
   u32 block_size_;
 
-friend class CommandTemporaryAllocator;
+friend class CommandEncodeAllocator;
 };
 
-class CommandTemporaryAllocator {
+class CommandEncodeAllocator {
 public:
   FrontendCommands * getNewCommandBlock();
   virtual i32 getNewGPUInputBlock(void **init_ptr) = 0;
@@ -593,7 +593,7 @@ public:
   inline GPUTemporaryInputAllocator initGPUInputAlloc();
 
 protected:
-  CommandTemporaryAllocator(char *start_gpu_input_ptr,
+  CommandEncodeAllocator(char *start_gpu_input_ptr,
                             u32 start_gpu_input_offset,
                             u32 gpu_input_block_size);
 
@@ -681,7 +681,7 @@ public:
   inline void endCopyPass(CopyPassEncoder &copy_enc);
 
 private:
-  inline CommandEncoder(CommandTemporaryAllocator *alloc);
+  inline CommandEncoder(CommandEncodeAllocator *alloc);
 
   CommandWriter cmd_writer_;
   FrontendCommands *cmds_head_;
@@ -823,11 +823,11 @@ public:
       = 0;
 
   // ==== Command recording & submission ======================================
-  virtual CommandTemporaryAllocator * createCommandTmpAllocator() = 0;
+  virtual CommandEncodeAllocator * createCommandTmpAllocator() = 0;
   virtual void destroyCommandTmpAllocator(
-      CommandTemporaryAllocator *alloc) = 0;
+      CommandEncodeAllocator *alloc) = 0;
 
-  inline CommandEncoder createCommandEncoder(CommandTemporaryAllocator *alloc);
+  inline CommandEncoder createCommandEncoder(CommandEncodeAllocator *alloc);
 
   inline void submit(CommandEncoder &enc);
   virtual void waitForIdle() = 0;
