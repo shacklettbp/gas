@@ -147,7 +147,7 @@ ErrorStatus GPURuntime::currentErrorStatus()
   return (ErrorStatus)err_atomic.load<sync::relaxed>();
 }
 
-CommandEncodeAllocator::CommandEncodeAllocator(
+CommandAllocator::CommandAllocator(
       char *start_gpu_input_ptr,
       u32 start_gpu_input_offset,
       u32 gpu_input_block_size)
@@ -160,7 +160,7 @@ CommandEncodeAllocator::CommandEncodeAllocator(
   cmds_start_->next = nullptr;
 }
 
-FrontendCommands * CommandEncodeAllocator::getNewCommandBlock()
+FrontendCommands * CommandAllocator::getNewCommandBlock()
 {
   if (cmds_cur_->next == nullptr) [[unlikely]] {
     FrontendCommands *next = 
@@ -175,7 +175,7 @@ FrontendCommands * CommandEncodeAllocator::getNewCommandBlock()
 }
 
 
-void CommandEncodeAllocator::destroy()
+void CommandAllocator::destroy()
 {
   FrontendCommands *cmds = cmds_start_;
 

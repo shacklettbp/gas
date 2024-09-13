@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
     .colorAttachments = { swapchain.proxyAttachment() },
   });
 
-  CommandEncodeAllocator *cmd_alloc = gpu->createCommandTmpAllocator();
+  CommandAllocator *cmd_alloc = gpu->createCommandAllocator();
   while (true) {
     {
       bool should_exit = wm.processEvents();
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
     gpu->presentSwapchainImage(swapchain);
   }
-  gpu->destroyCommandTmpAllocator(cmd_alloc);
+  gpu->destroyCommandAllocator(cmd_alloc);
 
   gpu->waitForIdle();
 

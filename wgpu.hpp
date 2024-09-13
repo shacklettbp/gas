@@ -73,9 +73,9 @@ struct BackendRasterPass {
 
 struct NoMetadata {};
 
-class EncodeAllocBackend : public CommandEncodeAllocator {
+class CommandAllocatorBackend : public CommandAllocator {
 public:
-  inline EncodeAllocBackend();
+  inline CommandAllocatorBackend();
   inline void destroy();
 
   i32 getNewGPUInputBlock(void **block_ptr) final;
@@ -255,8 +255,8 @@ public:
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;
   void presentSwapchainImage(Swapchain swapchain) final;
 
-  CommandEncodeAllocator * createCommandTmpAllocator() final; 
-  void destroyCommandTmpAllocator(CommandEncodeAllocator *alloc) final;
+  CommandAllocator * createCommandAllocator() final; 
+  void destroyCommandAllocator(CommandAllocator *alloc) final;
 
   void waitForIdle() final;
 

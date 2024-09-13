@@ -93,7 +93,7 @@ void CommandWriter::copyState(CommandWriter o)
 }
 
 
-CommandWriter::CommandWriter(CommandEncodeAllocator *alloc,
+CommandWriter::CommandWriter(CommandAllocator *alloc,
                              FrontendCommands *cmds)
   : alloc_(alloc),
     cmds_(cmds),
@@ -141,7 +141,7 @@ void GPUTemporaryInputAllocator::copyState(GPUTemporaryInputAllocator o)
 
 
 GPUTemporaryInputAllocator::GPUTemporaryInputAllocator(
-      CommandEncodeAllocator *alloc,
+      CommandAllocator *alloc,
       char *ptr, u32 offset, u32 block_size)
   : alloc_(alloc),
     ptr_(ptr),
@@ -149,12 +149,12 @@ GPUTemporaryInputAllocator::GPUTemporaryInputAllocator(
     block_size_(block_size)
 {}
 
-CommandWriter CommandEncodeAllocator::initCommandWriter()
+CommandWriter CommandAllocator::initCommandWriter()
 {
   return CommandWriter(this, cmds_start_);
 }
 
-GPUTemporaryInputAllocator CommandEncodeAllocator::initGPUInputAlloc()
+GPUTemporaryInputAllocator CommandAllocator::initGPUInputAlloc()
 {
   return GPUTemporaryInputAllocator(
       this, start_gpu_input_ptr_, start_gpu_input_offset_,
@@ -571,7 +571,7 @@ void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
   cmd_writer_.ctrl(CommandCtrl::CopyPass);
 }
 
-CommandEncoder::CommandEncoder(CommandEncodeAllocator *alloc)
+CommandEncoder::CommandEncoder(CommandAllocator *alloc)
   : cmd_writer_(alloc->initCommandWriter()),
     cmds_head_(cmd_writer_.cmds_)
 {}
@@ -728,7 +728,7 @@ void GPURuntime::destroyRasterShader(RasterShader shader)
 }
 
 CommandEncoder GPURuntime::createCommandEncoder(
-    CommandEncodeAllocator *alloc)
+    CommandAllocator *alloc)
 {
   return CommandEncoder(alloc);
 }
