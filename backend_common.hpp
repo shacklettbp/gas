@@ -379,6 +379,14 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
   if ((ctrl & DrawParamBlock2) != None) {
     printf(" | ParamBlock[2]");
   }
+
+  if ((ctrl & DrawDataBuffer) != None) {
+    printf(" | DrawDataBuffer");
+  }
+  if ((ctrl & DrawDataOffset) != None) {
+    printf(" | DrawDataOffset");
+  }
+
   if ((ctrl & DrawIndexBuffer) != None) {
     printf(" | IndexBuffer");
   }
@@ -396,12 +404,6 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
   }
   if ((ctrl & DrawNumInstances) != None) {
     printf(" | NumInstances");
-  }
-  if ((ctrl & DrawDynamicOffsets0) != None) {
-    printf(" | DynamicOffsets[0]");
-  }
-  if ((ctrl & DrawDynamicOffsets0) != None) {
-    printf(" | DynamicOffsets[1]");
   }
   printf("\n");
 }
@@ -464,18 +466,18 @@ public:
     }
   }
 
-  inline u32 dynamicBufferOffset0(CommandCtrl ctrl)
+  inline u32 drawDataBuffer(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawDynamicOffsets0)) {
+    if (t(ctrl, CommandCtrl::DrawDataBuffer)) {
       return next();
     } else {
       return 0xFFFF'FFFF;
     }
   }
 
-  inline u32 dynamicBufferOffset1(CommandCtrl ctrl)
+  inline u32 drawDataOffset(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawDynamicOffsets1)) {
+    if (t(ctrl, CommandCtrl::DrawDataOffset)) {
       return next();
     } else {
       return 0xFFFF'FFFF;

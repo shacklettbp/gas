@@ -112,7 +112,8 @@ int main(int argc, char *argv[])
     .colorAttachments = { swapchain.proxyAttachment() },
   });
 
-  CommandEncoder enc = gpu->createCommandEncoder();
+  GPUQueue main_queue = gpu->getMainQueue();
+  CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   while (true) {
     {
       bool should_exit = wm.processEvents();
@@ -125,7 +126,7 @@ int main(int argc, char *argv[])
       gpu->acquireSwapchainImage(swapchain);
     assert(swapchain_status == SwapchainStatus::Valid);
 
-    gpu->record(enc);
+    gpu->startEncoding(enc);
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(onscreen_pass);
 
@@ -135,7 +136,7 @@ int main(int argc, char *argv[])
 
       enc.endRasterPass(raster_enc);
     }
-    gpu->submit(enc);
+    gpu->submit(main_queue, enc);
 
     gpu->presentSwapchainImage(swapchain);
   }

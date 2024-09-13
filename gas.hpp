@@ -8,7 +8,6 @@
 
 namespace gas {
 
-class CommandAllocator;
 class RasterPassEncoder;
 class ComputePassEncoder;
 class CopyPassEncoder;
@@ -102,6 +101,10 @@ struct StagingHandle {
   Buffer buffer = {};
   u32 offset = 0;
   void *ptr = nullptr;
+};
+
+struct GPUQueue {
+  i32 id = -1;
 };
 
 enum class ErrorStatus : u32 {
@@ -430,8 +433,8 @@ enum class CommandCtrl : u32 {
   DrawVertexOffset    = 1 << 9,
   DrawInstanceOffset  = 1 << 10,
   DrawNumInstances    = 1 << 11,
-  DrawDynamicOffsets0 = 1 << 12,
-  DrawDynamicOffsets1 = 1 << 13,
+  DrawDataBuffer      = 1 << 12,
+  DrawDataOffset      = 1 << 13,
 
   Dispatch            = 1 << 0,
   ComputeShader       = 1 << 1,
@@ -477,7 +480,8 @@ struct DrawCommand {
   RasterShader shader = {};
   ParamBlock paramBlocks[3] = {};
   Buffer indexBuffer = {};
-  u32 dynamicBufferOffsets[2] = { 0, 0 };
+  u32 dataBuffer = 0;
+  u32 dataOffset = 0;
   u32 indexOffset = 0;
   u32 numTriangles = 0;
   u32 vertexOffset = 0;
@@ -544,11 +548,11 @@ static_assert(sizeof(FrontendCommands) == 4096);
 
 class CommandWriter {
 public:
-  inline void writeU32(CommandAllocator *alloc, u32 v);
+  inline void writeU32(GPURuntime *gpu, u32 v);
 
   template <typename T>
-  inline void id(CommandAllocator *alloc, T id);
-  inline void ctrl(CommandAllocator *alloc, CommandCtrl ctrl);
+  inline void id(GPURuntime *gpu, T id);
+  inline void ctrl(GPURuntime *gpu, CommandCtrl ctrl);
 
 private:
   FrontendCommands *cmds_;
@@ -558,43 +562,14 @@ friend class CommandEncoder;
 friend class GPURuntime;
 };
 
-class CommandInputGPUAllocator
+struct GPUTmpInputBlock
 {
-public:
-  inline void * alloc(u32 num_bytes, u32 alignment);
-  inline i32 getNewBlock(
-      CommandAllocator *alloc, u32 num_init_alloc_bytes, void **init_ptr);
+  inline u32 alloc(u32 num_bytes, u32 alignment);
+  inline bool blockFull() const;
 
-private:
-  char *ptr_;
-  u32 offset_;
-  u32 block_size_;
-
-friend class CommandEncoder;
-friend class GPURuntime;
-};
-
-class CommandAllocator {
-public:
-  FrontendCommands * getNewCommandBlock();
-  virtual i32 getNewGPUInputBlock(void **init_ptr) = 0;
-
-protected:
-  CommandAllocator(char *start_gpu_input_ptr,
-                   u32 start_gpu_input_offset,
-                   u32 gpu_input_block_size);
-
-  void destroy();
-
-  FrontendCommands *cmds_start_;
-  FrontendCommands *cmds_cur_;
-
-  char *start_gpu_input_ptr_;
-  u32 start_gpu_input_offset_;
-  u32 gpu_input_block_size_;
-
-friend class CommandEncoder;
-friend class GPURuntime;
+  char *ptr;
+  u32 offset;
+  u32 blockSize;
 };
 
 class RasterPassEncoder {
@@ -602,6 +577,9 @@ public:
   inline void setShader(RasterShader shader);
   inline void setParamBlock(i32 idx, ParamBlock param_block);
   inline void setIndexBuffer(Buffer buffer);
+
+  inline void * drawData(u32 num_bytes, u32 alignment);
+  template <typename T> T * drawData();
 
   inline void draw(u32 vertex_offset, u32 num_triangles);
   inline void drawIndexed(u32 vertex_offset,
@@ -618,13 +596,15 @@ private:
                          u32 index_offset, u32 num_triangles,
                          u32 instance_offset, u32 num_instances);
 
-  inline RasterPassEncoder(CommandAllocator *alloc,
+  inline RasterPassEncoder(GPURuntime *gpu,
                            CommandWriter writer,
-                           CommandInputGPUAllocator gpu_input);
+                           GPUQueue queue_,
+                           GPUTmpInputBlock gpu_input);
 
-  CommandAllocator *alloc_;
+  GPURuntime *gpu_;
   CommandWriter writer_;
-  CommandInputGPUAllocator gpu_input_;
+  GPUQueue queue_;
+  GPUTmpInputBlock gpu_input_;
   CommandCtrl ctrl_;
   DrawCommand state_;
 
@@ -654,9 +634,9 @@ public:
   inline void fillBuffer(Buffer buffer, u32 offset, u32 num_bytes, u32 v);
 
 private:
-  inline CopyPassEncoder(CommandAllocator *alloc, CommandWriter writer);
+  inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer);
 
-  CommandAllocator *alloc_;
+  GPURuntime *gpu_;
   CommandWriter writer_;
   CommandCtrl ctrl_;
   CopyCommand state_;
@@ -676,50 +656,47 @@ public:
   inline void endCopyPass(CopyPassEncoder &copy_enc);
 
 private:
-  inline CommandEncoder(CommandAllocator *alloc);
+  inline CommandEncoder(GPURuntime *gpu, GPUQueue queue);
 
-  CommandAllocator *alloc_;
+  GPURuntime *gpu_;
   FrontendCommands *cmds_head_;
   CommandWriter cmd_writer_;
-  CommandInputGPUAllocator gpu_input_;
+  GPUQueue queue_;
+  GPUTmpInputBlock gpu_input_;
 
 friend class GPURuntime;
-};
-
-struct TransferQueue {
-  i32 id = 0;
 };
 
 class GPURuntime {
 public:
   // ==== Create & destroy buffers and textures  ==============================
   inline Buffer createBuffer(BufferInit init,
-                             TransferQueue tx_queue = {});
+                             GPUQueue tx_queue = {});
 
   inline void destroyBuffer(Buffer buffer);
 
   inline Texture createTexture(TextureInit init,
-                               TransferQueue tx_queue = {});
+                               GPUQueue tx_queue = {});
 
   inline void destroyTexture(Texture texture);
 
   inline void createBuffers(i32 num_buffers,
                             const BufferInit *buffer_inits,
                             Buffer *handles_out,
-                            TransferQueue tx_queue = {});
+                            GPUQueue tx_queue = {});
 
   inline void destroyBuffers(i32 num_buffers, Buffer *buffers);
 
   inline void createTextures(i32 num_textures,
                              const TextureInit *texture_inits,
                              Texture *handles_out,
-                             TransferQueue tx_queue = {});
+                             GPUQueue tx_queue = {});
 
   inline void destroyTextures(i32 num_textures, Texture *textures);
 
   // Bulk create / destroy, prefer these for big groups of assets!
   inline void createGPUResources(GPUResourcesCreate create,
-                                 TransferQueue tx_queue = {});
+                                 GPUQueue tx_queue = {});
 
   inline void destroyGPUResources(GPUResourcesDestroy destroy);
 
@@ -729,7 +706,7 @@ public:
                                   i32 num_textures,
                                   const TextureInit *texture_inits,
                                   Texture *texture_handles_out,
-                                  TransferQueue tx_queue = {}) = 0;
+                                  GPUQueue tx_queue = {}) = 0;
 
   virtual void destroyGPUResources(i32 num_buffers,
                                    const Buffer *buffers,
@@ -820,11 +797,13 @@ public:
       = 0;
 
   // ==== Command recording & submission ======================================
-  inline CommandEncoder createCommandEncoder();
-  inline void destroyCommandEncoder(CommandEncoder encoder);
+  inline GPUQueue getMainQueue();
+  
+  inline CommandEncoder createCommandEncoder(GPUQueue queue);
+  inline void destroyCommandEncoder(CommandEncoder &encoder);
 
-  inline void record(CommandEncoder &enc);
-  inline void submit(CommandEncoder &enc);
+  inline void startEncoding(CommandEncoder &enc);
+  inline void submit(GPUQueue queue, CommandEncoder &enc);
   virtual void waitForIdle() = 0;
 
   // ==== Swapchain & presentation ============================================
@@ -838,10 +817,18 @@ public:
   ErrorStatus currentErrorStatus();
 
 protected:
-  virtual CommandAllocator * createCommandAllocator() = 0;
-  virtual void destroyCommandAllocator(CommandAllocator *alloc) = 0;
+  virtual void submit(GPUQueue queue, FrontendCommands *cmds) = 0;
 
-  virtual void submit(FrontendCommands *frontend_cmds) = 0;
+  FrontendCommands * allocCommandBlock();
+  void deallocCommandBlocks(FrontendCommands *cmds);
+
+  virtual void * allocGPUTmpInputBlock(GPUQueue queue,
+                                       u32 *block_idx) = 0;
+  virtual u32 getGPUTmpInputBlockSize() = 0;
+
+friend class CommandEncoder;
+friend class RasterPassEncoder;
+friend class CommandWriter;
 };
 
 class GPULib {

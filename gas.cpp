@@ -147,38 +147,16 @@ ErrorStatus GPURuntime::currentErrorStatus()
   return (ErrorStatus)err_atomic.load<sync::relaxed>();
 }
 
-CommandAllocator::CommandAllocator(
-      char *start_gpu_input_ptr,
-      u32 start_gpu_input_offset,
-      u32 gpu_input_block_size)
-  : cmds_start_((FrontendCommands *)rawAlloc(sizeof(FrontendCommands))),
-    cmds_cur_(cmds_start_),
-    start_gpu_input_ptr_(start_gpu_input_ptr),
-    start_gpu_input_offset_(start_gpu_input_offset),
-    gpu_input_block_size_(gpu_input_block_size)
+FrontendCommands * GPURuntime::allocCommandBlock()
 {
-  cmds_start_->next = nullptr;
+  auto cmds = (FrontendCommands *)rawAlloc(sizeof(FrontendCommands));
+  cmds->next = nullptr;
+
+  return cmds;
 }
 
-FrontendCommands * CommandAllocator::getNewCommandBlock()
+void GPURuntime::deallocCommandBlocks(FrontendCommands *cmds)
 {
-  if (cmds_cur_->next == nullptr) [[unlikely]] {
-    FrontendCommands *next = 
-        (FrontendCommands *)rawAlloc(sizeof(FrontendCommands));
-
-    cmds_cur_->next = next;
-    cmds_cur_ = next;
-    return cmds_cur_;
-  }
-
-  return cmds_cur_->next;
-}
-
-
-void CommandAllocator::destroy()
-{
-  FrontendCommands *cmds = cmds_start_;
-
   while (cmds != nullptr) {
     FrontendCommands *next = cmds->next;
     rawDealloc(next);

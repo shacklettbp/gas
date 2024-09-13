@@ -298,22 +298,6 @@ void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
 
 }
 
-CommandAllocatorBackend::CommandAllocatorBackend()
-  : CommandAllocator(nullptr, 0, 128 * 1024 * 1024)
-{
-}
-
-void CommandAllocatorBackend::destroy()
-{
-  CommandAllocator::destroy();
-}
-
-i32 CommandAllocatorBackend::getNewGPUInputBlock(void **block_ptr)
-{
-  *block_ptr = nullptr;
-  return 0;
-}
-
 GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
 {
   wgpu::InstanceDescriptor inst_desc {
@@ -530,7 +514,12 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
     dev(std::move(dev_in)),
     queue(std::move(queue_in)),
     inst(inst_in)
-{}
+{
+  for (i32 i = 0; i < (i32)queueData.size(); i++) {
+    queueData[i].tmpBuffersHead = 0;
+    queueData[i].tmpBuffersTail = 0;
+  }
+}
 
 void Backend::createGPUResources(i32 num_buffers,
                                  const BufferInit *buffer_inits,
@@ -538,7 +527,7 @@ void Backend::createGPUResources(i32 num_buffers,
                                  i32 num_textures,
                                  const TextureInit *texture_inits,
                                  Texture *texture_handles_out,
-                                 TransferQueue tx_queue)
+                                 GPUQueue tx_queue)
 {
   (void)tx_queue;
 
@@ -1419,29 +1408,57 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
 
 void Backend::waitForIdle()
 {
+  wgpu::QueueWorkDoneStatus queue_status;
+  auto workDoneCB = [&queue_status](wgpu::QueueWorkDoneStatus status_in)
+  {
+    queue_status = status_in;
+  };
+
+  wgpu::Future future = queue.OnSubmittedWorkDone(
+      wgpu::CallbackMode::WaitAnyOnly, workDoneCB);
+  wgpu::WaitStatus wait_status = inst.WaitAny(future, 0);
+
+  if (wait_status != wgpu::WaitStatus::Success ||
+      queue_status != wgpu::QueueWorkDoneStatus::Success) {
+    FATAL("Error in wgpu waitForIdle()");
+  }
 }
 
-CommandAllocator * Backend::createCommandAllocator()
+
+void * Backend::allocGPUTmpInputBlock(GPUQueue queue, u32 *block_idx)
 {
-  return new CommandAllocatorBackend {};
+  BackendQueueData &queue_data = queueData[queue.id];
+
+  return nullptr;
 }
 
-void Backend::destroyCommandAllocator(CommandAllocator *alloc)
+u32 Backend::getGPUTmpInputBlockSize()
 {
-  auto wgpu_alloc = static_cast<CommandAllocatorBackend *>(alloc);
-  wgpu_alloc->destroy();
-  delete wgpu_alloc;
+  return BackendQueueData::TMP_BLOCK_SIZE;
 }
 
-void Backend::submit(FrontendCommands *frontend_cmds)
+void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 {
 #ifdef GAS_WGPU_DEBUG_PRINT
   printf("WGPU: begin submit\n");
 #endif
 
+  BackendQueueData &queue_data = queueData[queue_hdl.id]; 
+  {
+    u32 cur_buf_idx = queue_data.tmpBuffersHead;
+    while (cur_buf_idx != queue_data.tmpBuffersTail) {
+      BackendTmpInputGPUBuffer &tmp_buffer =
+        queue_data.gpuTmpBuffers[cur_buf_idx];
+
+      tmp_buffer.buffer.Unmap();
+
+      cur_buf_idx = (cur_buf_idx + 1) % BackendQueueData::MAX_TMP_BUFFERS;
+    }
+  }
+
   wgpu::CommandEncoder wgpu_enc = dev.CreateCommandEncoder();
 
-  CommandDecoder decoder(frontend_cmds);
+  CommandDecoder decoder(cmds);
 
   auto encodeRasterPass = [&]()
   {
@@ -1498,6 +1515,7 @@ void Backend::submit(FrontendCommands *frontend_cmds)
     wgpu::RenderPassEncoder pass_enc =
         wgpu_enc.BeginRenderPass(&pass_descriptor);
 
+    wgpu::BindGroup dynamic_tmp_input_bind_group;
     for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
 #ifdef GAS_WGPU_DEBUG_PRINT
       debugPrintDrawCommandCtrl(ctrl);
@@ -1523,14 +1541,16 @@ void Backend::submit(FrontendCommands *frontend_cmds)
           pass_enc.SetBindGroup(2, *paramBlocks.hot(pb2));
         }
 
-        if (u32 dyn_offset_0 = decoder.dynamicBufferOffset0(ctrl);
-            dyn_offset_0 != 0xFFFF'FFFF) {
-          assert(false);
+        if (u32 data_buf_idx = decoder.drawDataBuffer(ctrl);
+            data_buf_idx != 0xFFFF'FFFF) {
+          dynamic_tmp_input_bind_group =
+              queue_data.gpuTmpBuffers[data_buf_idx].bindGroup;
         }
 
-        if (u32 dyn_offset_1 = decoder.dynamicBufferOffset1(ctrl);
-            dyn_offset_1 != 0xFFFF'FFFF) {
-          assert(false);
+        if (u32 data_offset = decoder.drawDataOffset(ctrl);
+            data_offset != 0xFFFF'FFFF) {
+          pass_enc.SetBindGroup(
+              3, dynamic_tmp_input_bind_group, 1, &data_offset);
         }
 
         DrawParams draw_params = decoder.drawParams(ctrl);

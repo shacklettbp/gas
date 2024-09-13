@@ -7,7 +7,7 @@
 
 namespace gas::webgpu {
 
-using namespace gas;
+class Backend;
 
 class BackendSwapchain {
 public:
@@ -73,12 +73,20 @@ struct BackendRasterPass {
 
 struct NoMetadata {};
 
-class CommandAllocatorBackend : public CommandAllocator {
-public:
-  inline CommandAllocatorBackend();
-  inline void destroy();
+struct BackendTmpInputGPUBuffer {
+  wgpu::Buffer buffer;
+  void *ptr;
+  wgpu::BindGroup bindGroup;
+};
 
-  i32 getNewGPUInputBlock(void **block_ptr) final;
+struct BackendQueueData {
+  static constexpr inline u32 MAX_TMP_BUFFERS = 16;
+  static constexpr inline u32 TMP_BUFFER_SIZE = 128 * 1024 * 1024;
+  static constexpr inline u32 TMP_BLOCK_SIZE = TMP_BUFFER_SIZE / 8;
+
+  BackendTmpInputGPUBuffer gpuTmpBuffers[MAX_TMP_BUFFERS];
+  u32 tmpBuffersHead;
+  u32 tmpBuffersTail;
 };
 
 class WebGPUAPI final : public GPUAPI {
@@ -172,6 +180,10 @@ public:
 
   SwapchainStorage swapchains {};
 
+  wgpu::BindGroupLayout tmpDataDynamicUniformLayout;
+
+  std::array<BackendQueueData, 2> queueData;
+
   inline Backend(wgpu::Adapter &&adapter,
                  wgpu::Device &&dev,
                  wgpu::Queue &&queue,
@@ -184,7 +196,7 @@ public:
                           i32 num_textures,
                           const TextureInit *texture_inits,
                           Texture *texture_handles_out,
-                          TransferQueue tx_queue = {}) final;
+                          GPUQueue tx_queue = {}) final;
 
   void destroyGPUResources(i32 num_buffers,
                            const Buffer *buffer_hdls,
@@ -257,16 +269,16 @@ public:
 
   void waitForIdle() final;
 
+  void * allocGPUTmpInputBlock(GPUQueue queue, u32 *block_idx) final;
+  u32 getGPUTmpInputBlockSize() final;
+
   inline BackendRasterPassConfig * getRasterPassConfigByID(
       RasterPassInterfaceID id);
 
   inline wgpu::BindGroupLayout getBindGroupLayoutByParamBlockTypeID(
       ParamBlockTypeID id);
 
-protected:
-  CommandAllocator * createCommandAllocator() final; 
-  void destroyCommandAllocator(CommandAllocator *alloc) final;
-  void submit(FrontendCommands *frontend_cmds) final;
+  void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };
 
 }
