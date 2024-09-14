@@ -75,7 +75,7 @@ struct NoMetadata {};
 
 struct TmpDynamicUniformData {
   static constexpr inline u32 BUFFER_SIZE = 128 * 1024 * 1024;
-  static constexpr inline u32 BLOCK_SIZE = 16 * 1024;
+  static constexpr inline u32 BLOCK_SIZE = 8 * 1024 * 1024;
 
   wgpu::Buffer buffer;
   wgpu::BindGroup bindGroup;
@@ -166,12 +166,20 @@ using RasterShaderTable = ResourceTable<
 
 using SwapchainStorage = InlineArrayFreeList<BackendSwapchain, 1>;
 
+struct BackendLimits {
+  u32 maxNumUniformBytes;
+};
+
 class Backend final : public BackendCommon {
 public:
   wgpu::Adapter adapter;
   wgpu::Device dev;
   wgpu::Queue queue;
   wgpu::Instance inst;
+  BackendLimits limits;
+
+  wgpu::BindGroupLayout tmpDynamicUniformLayout;
+  std::array<BackendQueueData, 2> queueData;
 
   BufferTable buffers {};
   TextureTable textures {};
@@ -188,13 +196,11 @@ public:
 
   SwapchainStorage swapchains {};
 
-  wgpu::BindGroupLayout tmpDynamicUniformLayout;
-  std::array<BackendQueueData, 2> queueData;
-
   inline Backend(wgpu::Adapter &&adapter,
                  wgpu::Device &&dev,
                  wgpu::Queue &&queue,
                  wgpu::Instance &inst,
+                 BackendLimits &limits,
                  bool errors_are_fatal);
 
   void createGPUResources(i32 num_buffers,
@@ -284,6 +290,8 @@ public:
 
   inline wgpu::BindGroupLayout getBindGroupLayoutByParamBlockTypeID(
       ParamBlockTypeID id);
+
+  inline TmpDynamicUniformData allocTmpDynamicUniformData();
 
   void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };

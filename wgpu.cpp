@@ -22,6 +22,7 @@ namespace {
 struct InitDeviceResult {
   wgpu::Adapter adapter;
   wgpu::Device device;
+  BackendLimits limits;
 };
 
 inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
@@ -408,6 +409,7 @@ static InitDeviceResult initDevice(
   assert(idx == 0);
   assert(surfaces.size() <= 1); // Can only have one compatible surface
 
+  wgpu::SupportedLimits supported_limits;
   wgpu::Adapter adapter;
   {
     wgpu::RequestAdapterOptions request_options {
@@ -436,11 +438,22 @@ static InitDeviceResult initDevice(
     if (wait_status != wgpu::WaitStatus::Success) {
       FATAL("Requesting adapter failed during wait: %d", (int)wait_status);
     }
+
+    wgpu::Status limits_status = adapter.GetLimits(&supported_limits);
+    if (limits_status != wgpu::Status::Success) {
+      FATAL("Failed to get supported limits from adapter");
+    }
   }
 
   wgpu::Device device;
   {
+    wgpu::RequiredLimits required_limits {};
+    required_limits.limits.maxUniformBufferBindingSize =
+        supported_limits.limits.maxUniformBufferBindingSize;
+
     wgpu::DeviceDescriptor dev_desc;
+    dev_desc.requiredLimits = &required_limits;
+
     dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
                                    deviceLostCB, &api->destroyingDevice);
     dev_desc.SetUncapturedErrorCallback(uncapturedErrorCB, (void *)nullptr);
@@ -466,18 +479,23 @@ static InitDeviceResult initDevice(
 
   device.SetLoggingCallback(deviceLoggingCB, nullptr);
 
-  return { std::move(adapter), std::move(device) };
+  BackendLimits out_limits {
+    .maxNumUniformBytes =
+        (u32)supported_limits.limits.maxUniformBufferBindingSize,
+  };
+
+  return { std::move(adapter), std::move(device), out_limits };
 }
 
 GPURuntime * WebGPUAPI::createRuntime(
     i32 gpu_idx, Span<const Surface> surfaces)
 {
-  auto [adapter, device] = initDevice(this, gpu_idx, surfaces);
+  auto [adapter, device, limits] = initDevice(this, gpu_idx, surfaces);
 
   wgpu::Queue queue = device.GetQueue();
 
   return new Backend(std::move(adapter), std::move(device), std::move(queue),
-                     inst, errorsAreFatal);
+                     inst, limits, errorsAreFatal);
 }
 
 void WebGPUAPI::destroyRuntime(GPURuntime *runtime)
@@ -514,50 +532,18 @@ ShaderByteCodeType WebGPUAPI::backendShaderByteCodeType()
   return ShaderByteCodeType::WGSL;
 }
 
-static TmpDynamicUniformData allocTmpDynamicUniformData(
-    wgpu::Device &dev, wgpu::BindGroupLayout &bind_group_layout)
-{
-  wgpu::BufferDescriptor buffer_desc {
-    .usage = (wgpu::BufferUsage)(
-        wgpu::BufferUsage::Uniform | 
-        wgpu::BufferUsage::CopyDst),
-    .size = TmpDynamicUniformData::BUFFER_SIZE,
-  };
-
-  wgpu::Buffer buffer = dev.CreateBuffer(&buffer_desc);
-
-  wgpu::BindGroupEntry bind_group_entry {
-    .binding = 0,
-    .buffer = buffer,
-    .offset = 0,
-    .size = TmpDynamicUniformData::BLOCK_SIZE,
-  };
-
-  wgpu::BindGroupDescriptor bind_group_desc {
-    .layout = bind_group_layout,
-    .entryCount = 1,
-    .entries = &bind_group_entry,
-  };
-
-  wgpu::BindGroup bind_group = dev.CreateBindGroup(&bind_group_desc);
-
-  return TmpDynamicUniformData {
-    .buffer = buffer,
-    .bindGroup = bind_group,
-    .ptr = (uint8_t *)rawAlloc(TmpDynamicUniformData::BUFFER_SIZE),
-  };
-}
-
 Backend::Backend(wgpu::Adapter &&adapter_in,
                  wgpu::Device &&dev_in,
                  wgpu::Queue &&queue_in,
                  wgpu::Instance &inst_in,
+                 BackendLimits &limits_in,
                  bool errors_are_fatal)
   : BackendCommon(errors_are_fatal),
     adapter(std::move(adapter_in)),
     dev(std::move(dev_in)),
     queue(std::move(queue_in)),
-    inst(inst_in)
+    inst(inst_in),
+    limits(limits_in)
 {
   {
     wgpu::BindGroupLayoutEntry layout_entry {
@@ -568,7 +554,7 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
       .buffer = wgpu::BufferBindingLayout {
         .type = wgpu::BufferBindingType::Uniform,
         .hasDynamicOffset = true,
-        .minBindingSize = TmpDynamicUniformData::BLOCK_SIZE,
+        .minBindingSize = limits.maxNumUniformBytes,
       },
     };
 
@@ -584,8 +570,7 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
   {
     GPUTmpInputState &gpu_tmp_input = queueData[0].gpuTmpInput;
 
-    gpu_tmp_input.buffers[0] = allocTmpDynamicUniformData(
-        dev, tmpDynamicUniformLayout);
+    gpu_tmp_input.buffers[0] = allocTmpDynamicUniformData();
 
     gpu_tmp_input.numAllocated = 1;
     gpu_tmp_input.curBuffer = 0;
@@ -1538,8 +1523,7 @@ u32 Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl,
   assert(buf_idx < GPUTmpInputState::MAX_BUFFERS);
 
   if (buf_idx == state.numAllocated) [[unlikely]] {
-    state.buffers[buf_idx] = allocTmpDynamicUniformData(
-        dev, tmpDynamicUniformLayout);
+    state.buffers[buf_idx] = allocTmpDynamicUniformData();
     state.numAllocated += 1;
   }
 
@@ -1817,6 +1801,40 @@ wgpu::BindGroupLayout Backend::getBindGroupLayoutByParamBlockTypeID(
     }
   }
 }
+
+TmpDynamicUniformData Backend::allocTmpDynamicUniformData()
+{
+  wgpu::BufferDescriptor buffer_desc {
+    .usage = (wgpu::BufferUsage)(
+        wgpu::BufferUsage::Uniform | 
+        wgpu::BufferUsage::CopyDst),
+    .size = TmpDynamicUniformData::BUFFER_SIZE,
+  };
+
+  wgpu::Buffer buffer = dev.CreateBuffer(&buffer_desc);
+
+  wgpu::BindGroupEntry bind_group_entry {
+    .binding = 0,
+    .buffer = buffer,
+    .offset = 0,
+    .size = limits.maxNumUniformBytes,
+  };
+
+  wgpu::BindGroupDescriptor bind_group_desc {
+    .layout = tmpDynamicUniformLayout,
+    .entryCount = 1,
+    .entries = &bind_group_entry,
+  };
+
+  wgpu::BindGroup bind_group = dev.CreateBindGroup(&bind_group_desc);
+
+  return TmpDynamicUniformData {
+    .buffer = buffer,
+    .bindGroup = bind_group,
+    .ptr = (uint8_t *)rawAlloc(TmpDynamicUniformData::BUFFER_SIZE),
+  };
+}
+
 
 GPULib * loadWebGPULib()
 {
