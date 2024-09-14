@@ -445,6 +445,10 @@ static InitDeviceResult initDevice(
     }
   }
 
+  if (supported_limits.limits.maxUniformBufferBindingSize > 65536) {
+    supported_limits.limits.maxUniformBufferBindingSize = 65536;
+  }
+
   wgpu::Device device;
   {
     wgpu::RequiredLimits required_limits {};
@@ -578,7 +582,7 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
   }
 
   // Initialize other queues with no tmp data initially allocated
-  for (i32 i = 1; i < queueData.size(); i++) {
+  for (i32 i = 1; i < (i32)queueData.size(); i++) {
     GPUTmpInputState &gpu_tmp_input = queueData[i].gpuTmpInput;
 
     gpu_tmp_input.numAllocated = 0;
