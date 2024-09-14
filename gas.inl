@@ -110,7 +110,7 @@ u32 GPUTmpInputBlock::alloc(u32 num_bytes)
 
 bool GPUTmpInputBlock::blockFull() const
 { 
-  return offset > endOffset; 
+  return offset > BLOCK_SIZE; 
 }
 
 void RasterPassEncoder::setShader(RasterShader shader)
@@ -134,33 +134,70 @@ void RasterPassEncoder::setParamBlock(i32 idx, ParamBlock param_block)
   state_.paramBlocks[idx] = param_block;
 }
 
-void RasterPassEncoder::setIndexBuffer(Buffer buffer)
+void RasterPassEncoder::setVertexBuffer(i32 idx, Buffer buffer)
+{
+  assert(idx >= 0 && idx < 2);
+
+  if (state_.vertexBuffer[idx] == buffer) {
+    return;
+  }
+
+  ctrl_ |= CommandCtrl((u32)CommandCtrl::DrawVertexBuffer0 << idx);
+  state_.vertexBuffer[idx] = buffer;
+}
+
+void RasterPassEncoder::setIndexBufferU32(Buffer buffer)
 {
   if (state_.indexBuffer == buffer) {
     return;
   }
 
-  ctrl_ |= CommandCtrl::DrawIndexBuffer;
+  ctrl_ |= CommandCtrl::DrawIndexBuffer32;
   state_.indexBuffer = buffer;
+}
+
+void RasterPassEncoder::setIndexBufferU16(Buffer buffer)
+{
+  if (state_.indexBuffer == buffer) {
+    return;
+  }
+
+  ctrl_ |= CommandCtrl::DrawIndexBuffer16;
+  state_.indexBuffer = buffer;
+}
+
+MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
+{
+  u32 offset = gpu_input_.alloc(num_bytes);
+  if (gpu_input_.blockFull()) [[unlikely]] {
+    gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
+    offset = gpu_input_.offset;
+
+    gpu_input_.offset += num_bytes;
+  }
+
+  return MappedTmpBuffer {
+    .buffer = gpu_input_.buffer,
+    .offset = offset,
+    .ptr = gpu_input_.ptr,
+  };
 }
 
 void * RasterPassEncoder::drawData(u32 num_bytes)
 {
   u32 offset = gpu_input_.alloc(num_bytes);
   if (gpu_input_.blockFull()) [[unlikely]] {
-    GPUTmpInputBlock new_block;
-    u32 new_block_idx = gpu_->allocGPUTmpInputBlock(queue_, &new_block);
+    GPUTmpInputBlock new_block = gpu_->allocGPUTmpInputBlock(queue_);
 
-    if (gpu_input_.ptr != new_block.ptr) {
+    if (gpu_input_.buffer != new_block.buffer) {
       ctrl_ |= CommandCtrl::DrawDataBuffer;
-      state_.dataBuffer = new_block_idx;
+      state_.dataBuffer = new_block.buffer;
 
       gpu_input_.ptr = new_block.ptr;
+      gpu_input_.buffer = new_block.buffer;
     }
 
     gpu_input_.offset = new_block.offset + num_bytes;
-    gpu_input_.endOffset = new_block.endOffset;
-
     offset = new_block.offset;
   }
 
@@ -174,6 +211,12 @@ template <typename T>
 T * RasterPassEncoder::drawData()
 {
   return (T *)drawData((u32)sizeof(T));
+}
+
+template <typename T>
+void RasterPassEncoder::drawData(T v)
+{
+  *drawData<T>() = v;
 }
 
 void RasterPassEncoder::draw(u32 vertex_offset, u32 num_triangles)
@@ -260,11 +303,23 @@ void RasterPassEncoder::encodeDraw(
   }
 
   if ((ctrl_ & DrawDataBuffer) != None) {
-    writer_.writeU32(gpu_, state_.dataBuffer);
+    writer_.id(gpu_, state_.dataBuffer);
   }
 
   if ((ctrl_ & DrawDataOffset) != None) {
     writer_.writeU32(gpu_, state_.dataOffset);
+  }
+
+  if ((ctrl_ & DrawVertexBuffer0) != None) {
+    writer_.id(gpu_, state_.vertexBuffer[0]);
+  }
+
+  if ((ctrl_ & DrawVertexBuffer1) != None) {
+    writer_.id(gpu_, state_.vertexBuffer[1]);
+  }
+
+  if ((ctrl_ & (DrawIndexBuffer32 | DrawIndexBuffer16)) != None) {
+    writer_.id(gpu_, state_.indexBuffer);
   }
 
   if ((ctrl_ & DrawIndexOffset) != None) {
@@ -741,8 +796,7 @@ void GPURuntime::startEncoding(CommandEncoder &enc)
   enc.cmd_writer_.cmds_ = enc.cmds_head_;
   enc.cmd_writer_.offset_ = 0;
 
-  enc.gpu_input_.offset = 1;
-  enc.gpu_input_.endOffset = 0;
+  enc.gpu_input_ = GPUTmpInputBlock {};
 }
 
 void GPURuntime::submit(GPUQueue queue, CommandEncoder &enc)

@@ -387,8 +387,11 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
     printf(" | DrawDataOffset");
   }
 
-  if ((ctrl & DrawIndexBuffer) != None) {
-    printf(" | IndexBuffer");
+  if ((ctrl & DrawIndexBuffer32) != None) {
+    printf(" | IndexBuffer32");
+  }
+  if ((ctrl & DrawIndexBuffer16) != None) {
+    printf(" | IndexBuffer32");
   }
   if ((ctrl & DrawIndexOffset) != None) {
     printf(" | IndexOffset");
@@ -466,12 +469,12 @@ public:
     }
   }
 
-  inline u32 drawDataBuffer(CommandCtrl ctrl)
+  inline Buffer drawDataBuffer(CommandCtrl ctrl)
   {
     if (t(ctrl, CommandCtrl::DrawDataBuffer)) {
-      return next();
+      return id<Buffer>();
     } else {
-      return 0xFFFF'FFFF;
+      return {};
     }
   }
 
@@ -481,6 +484,42 @@ public:
       return next();
     } else {
       return 0xFFFF'FFFF;
+    }
+  }
+
+  inline Buffer drawVertexBuffer0(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CommandCtrl::DrawVertexBuffer0)) {
+      return id<Buffer>();
+    } {
+      return {};
+    }
+  }
+
+  inline Buffer drawVertexBuffer1(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CommandCtrl::DrawVertexBuffer1)) {
+      return id<Buffer>();
+    } {
+      return {};
+    }
+  }
+
+  inline Buffer drawIndexBuffer32(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CommandCtrl::DrawIndexBuffer32)) {
+      return id<Buffer>();
+    } {
+      return {};
+    }
+  }
+
+  inline Buffer drawIndexBuffer16(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CommandCtrl::DrawIndexBuffer16)) {
+      return id<Buffer>();
+    } {
+      return {};
     }
   }
 

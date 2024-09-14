@@ -113,6 +113,8 @@ int main(int argc, char *argv[])
     .colorAttachments = { swapchain.proxyAttachment() },
   });
 
+  u32 frame_num = 0;
+
   GPUQueue main_queue = gpu->getMainQueue();
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   while (true) {
@@ -134,23 +136,19 @@ int main(int argc, char *argv[])
       raster_enc.setShader(shader);
       raster_enc.setParamBlock(0, global_param_blk);
 
-      {
-        Vector3 *draw_color = raster_enc.drawData<Vector3>();
-        *draw_color = { 1, 0, 0 };
-        raster_enc.draw(0, 1);
-      }
+      raster_enc.drawData(Vector3 { 1, 0, 0 });
+      raster_enc.draw(0, 1);
 
-      {
-        Vector3 *draw_color = raster_enc.drawData<Vector3>();
-        *draw_color = { 0, 1, 0 };
-        raster_enc.draw(0, 1);
-      }
+      raster_enc.drawData(Vector3 { 1, sinf(math::toRadians(frame_num)), 0 });
+      raster_enc.draw(0, 1);
 
       enc.endRasterPass(raster_enc);
     }
     gpu->submit(main_queue, enc);
 
     gpu->presentSwapchainImage(swapchain);
+
+    frame_num += 1;
   }
   gpu->waitForIdle();
 

@@ -75,9 +75,7 @@ struct NoMetadata {};
 
 struct TmpDynamicUniformData {
   static constexpr inline u32 BUFFER_SIZE = 128 * 1024 * 1024;
-  static constexpr inline u32 BLOCK_SIZE = 8 * 1024 * 1024;
 
-  wgpu::Buffer buffer;
   wgpu::BindGroup bindGroup;
   uint8_t *ptr;
 };
@@ -86,6 +84,7 @@ struct GPUTmpInputState {
   static constexpr inline i32 MAX_BUFFERS = 16;
 
   std::array<TmpDynamicUniformData, MAX_BUFFERS> buffers;
+  u32 bufferHandlesBase;
   u32 numAllocated;
   u32 curBuffer;
 
@@ -282,8 +281,7 @@ public:
 
   void waitForIdle() final;
 
-  u32 allocGPUTmpInputBlock(GPUQueue queue_hdl,
-                            GPUTmpInputBlock *block_out) final;
+  GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
 
   inline BackendRasterPassConfig * getRasterPassConfigByID(
       RasterPassInterfaceID id);
@@ -291,7 +289,8 @@ public:
   inline wgpu::BindGroupLayout getBindGroupLayoutByParamBlockTypeID(
       ParamBlockTypeID id);
 
-  inline TmpDynamicUniformData allocTmpDynamicUniformData();
+  inline TmpDynamicUniformData allocTmpDynamicUniformData(
+      u32 buffer_handle_idx);
 
   void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };

@@ -103,6 +103,12 @@ struct StagingHandle {
   void *ptr = nullptr;
 };
 
+struct MappedTmpBuffer {
+  Buffer buffer;
+  u32 offset;
+  void *ptr;
+};
+
 struct GPUQueue {
   i32 id = -1;
 };
@@ -428,14 +434,17 @@ enum class CommandCtrl : u32 {
   DrawParamBlock0     = 1 << 3,
   DrawParamBlock1     = 1 << 4,
   DrawParamBlock2     = 1 << 5,
-  DrawIndexBuffer     = 1 << 6,
-  DrawIndexOffset     = 1 << 7,
-  DrawNumTriangles    = 1 << 8,
-  DrawVertexOffset    = 1 << 9,
-  DrawInstanceOffset  = 1 << 10,
-  DrawNumInstances    = 1 << 11,
-  DrawDataBuffer      = 1 << 12,
-  DrawDataOffset      = 1 << 13,
+  DrawDataBuffer      = 1 << 6,
+  DrawDataOffset      = 1 << 7,
+  DrawVertexBuffer0   = 1 << 8,
+  DrawVertexBuffer1   = 1 << 9,
+  DrawIndexBuffer32   = 1 << 10,
+  DrawIndexBuffer16   = 1 << 11,
+  DrawIndexOffset     = 1 << 12,
+  DrawNumTriangles    = 1 << 13,
+  DrawVertexOffset    = 1 << 14,
+  DrawInstanceOffset  = 1 << 15,
+  DrawNumInstances    = 1 << 16,
 
   Dispatch            = 1 << 0,
   ComputeShader       = 1 << 1,
@@ -480,8 +489,9 @@ inline CommandCtrl operator&(CommandCtrl a, CommandCtrl b);
 struct DrawCommand {
   RasterShader shader = {};
   ParamBlock paramBlocks[3] = {};
+  Buffer vertexBuffer[2] = {};
   Buffer indexBuffer = {};
-  u32 dataBuffer = 0;
+  Buffer dataBuffer = {};
   u32 dataOffset = 0;
   u32 indexOffset = 0;
   u32 numTriangles = 0;
@@ -568,19 +578,26 @@ struct GPUTmpInputBlock
   inline u32 alloc(u32 num_bytes);
   inline bool blockFull() const;
 
-  uint8_t *ptr;
-  u32 offset;
-  u32 endOffset;
+  static constexpr inline u32 BLOCK_SIZE = 4 * 1024 * 1024;
+
+  uint8_t *ptr = nullptr;
+  Buffer buffer {};
+  u32 offset = BLOCK_SIZE + 1; // blockFull() is true when offset > BLOCK_SIZE
 };
 
 class RasterPassEncoder {
 public:
   inline void setShader(RasterShader shader);
   inline void setParamBlock(i32 idx, ParamBlock param_block);
-  inline void setIndexBuffer(Buffer buffer);
+  inline void setVertexBuffer(i32 idx, Buffer buffer);
+  inline void setIndexBufferU32(Buffer buffer);
+  inline void setIndexBufferU16(Buffer buffer);
+
+  inline MappedTmpBuffer tmpBuffer(u32 num_bytes);
 
   inline void * drawData(u32 num_bytes);
   template <typename T> T * drawData();
+  template <typename T> void drawData(T v);
 
   inline void draw(u32 vertex_offset, u32 num_triangles);
   inline void drawIndexed(u32 vertex_offset,
@@ -823,8 +840,7 @@ protected:
   FrontendCommands * allocCommandBlock();
   void deallocCommandBlocks(FrontendCommands *cmds);
 
-  virtual u32 allocGPUTmpInputBlock(
-      GPUQueue queue, GPUTmpInputBlock *out_block) = 0;
+  virtual GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue) = 0;
 
 friend class CommandEncoder;
 friend class RasterPassEncoder;

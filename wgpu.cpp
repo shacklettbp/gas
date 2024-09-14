@@ -511,9 +511,18 @@ void WebGPUAPI::destroyRuntime(GPURuntime *runtime)
 
     for (i32 i = 0; i < (i32)gpu_tmp_input_state.numAllocated; i++) {
       TmpDynamicUniformData &tmp = gpu_tmp_input_state.buffers[i];
-      tmp.buffer.Destroy();
       rawDealloc(tmp.ptr);
+
+      auto [to_buffer, _, id] = wgpu_backend->buffers.get(
+          gpu_tmp_input_state.bufferHandlesBase, i);
+
+      to_buffer->Destroy();
+      to_buffer->~Buffer();
     }
+
+    wgpu_backend->buffers.releaseRows(
+        gpu_tmp_input_state.bufferHandlesBase,
+        GPUTmpInputState::MAX_BUFFERS);
   }
 
   // Hacky, the device lost callback has a pointer
@@ -573,8 +582,11 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
   // Pre allocate a tmp data block for the main queue
   {
     GPUTmpInputState &gpu_tmp_input = queueData[0].gpuTmpInput;
+    gpu_tmp_input.bufferHandlesBase =
+        buffers.reserveRows(GPUTmpInputState::MAX_BUFFERS);
 
-    gpu_tmp_input.buffers[0] = allocTmpDynamicUniformData();
+    gpu_tmp_input.buffers[0] = allocTmpDynamicUniformData(
+        gpu_tmp_input.bufferHandlesBase);
 
     gpu_tmp_input.numAllocated = 1;
     gpu_tmp_input.curBuffer = 0;
@@ -584,6 +596,8 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
   // Initialize other queues with no tmp data initially allocated
   for (i32 i = 1; i < (i32)queueData.size(); i++) {
     GPUTmpInputState &gpu_tmp_input = queueData[i].gpuTmpInput;
+    gpu_tmp_input.bufferHandlesBase =
+        buffers.reserveRows(GPUTmpInputState::MAX_BUFFERS);
 
     gpu_tmp_input.numAllocated = 0;
     gpu_tmp_input.curBuffer = 0;
@@ -1498,8 +1512,12 @@ void Backend::waitForIdle()
   }
 }
 
-u32 Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl,
-                                   GPUTmpInputBlock *block_out)
+// GPUTmpInputState::MAX_BUFFERS frontend buffer handles are reserved starting 
+// at GPUTmpInputState::bufferHandlesBase  -1 for these temporary buffers.
+// This lets us abuse the return value of this function to both refer to the
+// actual buffer handle and the pre created bind group that refers to these
+// full buffers.
+GPUTmpInputBlock Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl)
 {
   GPUTmpInputState &state = queueData[queue_hdl.id].gpuTmpInput;
 
@@ -1510,39 +1528,46 @@ u32 Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl,
 
   if (buf_offset < TmpDynamicUniformData::BUFFER_SIZE) [[likely]] {
     TmpDynamicUniformData &cur_tmp = state.buffers[buf_idx];
-    state.offset += TmpDynamicUniformData::BLOCK_SIZE;
+    state.offset += GPUTmpInputBlock::BLOCK_SIZE;
     
     state.lock.unlock();
 
-    *block_out = {
-      .ptr = cur_tmp.ptr,
-      .offset = buf_offset,
-      .endOffset = buf_offset + TmpDynamicUniformData::BLOCK_SIZE,
+    Buffer buffer_hdl {
+      .gen = 1,
+      .id = u16(state.bufferHandlesBase + buf_idx),
     };
 
-    return buf_idx;
+    return {
+      .ptr = cur_tmp.ptr,
+      .buffer = buffer_hdl,
+      .offset = buf_offset,
+    };
   }
 
   buf_idx = ++state.curBuffer;
   assert(buf_idx < GPUTmpInputState::MAX_BUFFERS);
 
   if (buf_idx == state.numAllocated) [[unlikely]] {
-    state.buffers[buf_idx] = allocTmpDynamicUniformData();
+    state.buffers[buf_idx] = allocTmpDynamicUniformData(
+        state.bufferHandlesBase + buf_idx);
     state.numAllocated += 1;
   }
 
   TmpDynamicUniformData &new_tmp = state.buffers[buf_idx];
-  state.offset = TmpDynamicUniformData::BLOCK_SIZE;
+  state.offset = GPUTmpInputBlock::BLOCK_SIZE;
 
   state.lock.unlock();
 
-  *block_out = {
-    .ptr = new_tmp.ptr,
-    .offset = 0,
-    .endOffset = TmpDynamicUniformData::BLOCK_SIZE,
+  Buffer buffer_hdl {
+    .gen = 1,
+    .id = u16(state.bufferHandlesBase + buf_idx),
   };
 
-  return buf_idx;
+  return {
+    .ptr = new_tmp.ptr,
+    .buffer = buffer_hdl,
+    .offset = 0,
+  };
 
 #if 0
   AtomicU32Ref atomic_tail(queue_data.tmpBuffersTail);
@@ -1609,8 +1634,11 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
       TmpDynamicUniformData &tmp_dyn_uniform =
          gpu_tmp_input_state.buffers[i];
 
+      auto [to_gpu_tmp_buffer, _1, _2] =
+          buffers.get(gpu_tmp_input_state.bufferHandlesBase, i);
+
       wgpu_enc.WriteBuffer(
-          tmp_dyn_uniform.buffer, 0,
+          *to_gpu_tmp_buffer, 0,
           tmp_dyn_uniform.ptr, TmpDynamicUniformData::BUFFER_SIZE);
     }
 
@@ -1618,7 +1646,11 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
       TmpDynamicUniformData &tmp_dyn_uniform =
          gpu_tmp_input_state.buffers[gpu_tmp_input_state.curBuffer];
 
-      wgpu_enc.WriteBuffer(tmp_dyn_uniform.buffer, 0,
+      auto [to_gpu_tmp_buffer, _1, _2] =
+          buffers.get(gpu_tmp_input_state.bufferHandlesBase,
+                      gpu_tmp_input_state.curBuffer);
+
+      wgpu_enc.WriteBuffer(*to_gpu_tmp_buffer, 0,
           tmp_dyn_uniform.ptr, gpu_tmp_input_state.offset);
     }
 
@@ -1713,16 +1745,32 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           dynamic_bind_group_idx = 3;
         }
 
-        if (u32 data_buf_idx = decoder.drawDataBuffer(ctrl);
-            data_buf_idx != 0xFFFF'FFFF) {
+        if (Buffer data_buf = decoder.drawDataBuffer(ctrl); !data_buf.null()) {
+          u32 tmp_buf_idx = 
+              (u32)data_buf.id - gpu_tmp_input_state.bufferHandlesBase;
+
           dynamic_tmp_input_bind_group =
-              gpu_tmp_input_state.buffers[data_buf_idx].bindGroup;
+              gpu_tmp_input_state.buffers[tmp_buf_idx].bindGroup;
         }
 
         if (u32 data_offset = decoder.drawDataOffset(ctrl);
             data_offset != 0xFFFF'FFFF) {
           pass_enc.SetBindGroup(dynamic_bind_group_idx,
                                 dynamic_tmp_input_bind_group, 1, &data_offset);
+        }
+
+        if (Buffer vb0 = decoder.drawVertexBuffer0(ctrl); !vb0.null()) {
+          pass_enc.SetVertexBuffer(0, *buffers.hot(vb0));
+        }
+
+        if (Buffer vb1 = decoder.drawVertexBuffer1(ctrl); !vb1.null()) {
+          pass_enc.SetVertexBuffer(1, *buffers.hot(vb1));
+        }
+
+        if (Buffer ib = decoder.drawIndexBuffer32(ctrl); !ib.null()) {
+          pass_enc.SetIndexBuffer(*buffers.hot(ib), wgpu::IndexFormat::Uint32);
+        } else if (Buffer ib = decoder.drawIndexBuffer16(ctrl); !ib.null()) {
+          pass_enc.SetIndexBuffer(*buffers.hot(ib), wgpu::IndexFormat::Uint16);
         }
 
         DrawParams draw_params = decoder.drawParams(ctrl);
@@ -1806,12 +1854,16 @@ wgpu::BindGroupLayout Backend::getBindGroupLayoutByParamBlockTypeID(
   }
 }
 
-TmpDynamicUniformData Backend::allocTmpDynamicUniformData()
+TmpDynamicUniformData Backend::allocTmpDynamicUniformData(
+    u32 buffer_handle_idx)
 {
   wgpu::BufferDescriptor buffer_desc {
-    .usage = (wgpu::BufferUsage)(
-        wgpu::BufferUsage::Uniform | 
-        wgpu::BufferUsage::CopyDst),
+    .usage = wgpu::BufferUsage::Uniform | 
+             wgpu::BufferUsage::Storage | 
+             wgpu::BufferUsage::Vertex | 
+             wgpu::BufferUsage::Index | 
+             wgpu::BufferUsage::CopySrc |
+             wgpu::BufferUsage::CopyDst,
     .size = TmpDynamicUniformData::BUFFER_SIZE,
   };
 
@@ -1832,8 +1884,12 @@ TmpDynamicUniformData Backend::allocTmpDynamicUniformData()
 
   wgpu::BindGroup bind_group = dev.CreateBindGroup(&bind_group_desc);
 
+  { // Save buffer to handle slot
+    auto [to_buffer, _1, _2] = buffers.get(buffer_handle_idx, 0);
+    new (to_buffer) wgpu::Buffer(std::move(buffer));
+  }
+
   return TmpDynamicUniformData {
-    .buffer = buffer,
     .bindGroup = bind_group,
     .ptr = (uint8_t *)rawAlloc(TmpDynamicUniformData::BUFFER_SIZE),
   };
