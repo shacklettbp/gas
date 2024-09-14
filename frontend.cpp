@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
   Buffer uniform_buf;
   {
-    Vector4 init { 1, 1, 0.5, 1 };
+    Vector4 init { 1, 1, 1, 1 };
     uniform_buf = gpu->createBuffer({
         .numBytes = 16, 
         .usage = BufferUsage::ShaderUniform,
@@ -103,6 +103,7 @@ int main(int argc, char *argv[])
     .fragmentEntry = "fragMain",
     .rasterPass = onscreen_pass_iface,
     .paramBlockTypes = { global_param_blk_type },
+    .numPerDrawBytes = sizeof(Vector3),
   });
 
   shaderc_alloc.release();
@@ -132,7 +133,18 @@ int main(int argc, char *argv[])
 
       raster_enc.setShader(shader);
       raster_enc.setParamBlock(0, global_param_blk);
-      raster_enc.draw(0, 1);
+
+      {
+        Vector3 *draw_color = raster_enc.drawData<Vector3>();
+        *draw_color = { 1, 0, 0 };
+        raster_enc.draw(0, 1);
+      }
+
+      {
+        Vector3 *draw_color = raster_enc.drawData<Vector3>();
+        *draw_color = { 0, 1, 0 };
+        raster_enc.draw(0, 1);
+      }
 
       enc.endRasterPass(raster_enc);
     }

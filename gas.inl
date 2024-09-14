@@ -101,16 +101,16 @@ void CommandWriter::ctrl(GPURuntime *gpu, CommandCtrl ctrl)
   writeU32(gpu, (u32)ctrl);
 }
 
-u32 GPUTmpInputBlock::alloc(u32 num_bytes, u32 alignment)
+u32 GPUTmpInputBlock::alloc(u32 num_bytes)
 {
-  u32 start = utils::roundUpPow2(offset, alignment);
+  u32 start = utils::roundUpPow2(offset, 256);
   offset = start + num_bytes;
   return start;
 }
 
 bool GPUTmpInputBlock::blockFull() const
 { 
-  return offset > blockSize; 
+  return offset > endOffset; 
 }
 
 void RasterPassEncoder::setShader(RasterShader shader)
@@ -144,19 +144,24 @@ void RasterPassEncoder::setIndexBuffer(Buffer buffer)
   state_.indexBuffer = buffer;
 }
 
-void * RasterPassEncoder::drawData(u32 num_bytes, u32 alignment)
+void * RasterPassEncoder::drawData(u32 num_bytes)
 {
-  u32 offset = gpu_input_.alloc(num_bytes, alignment);
+  u32 offset = gpu_input_.alloc(num_bytes);
   if (gpu_input_.blockFull()) [[unlikely]] {
-    u32 new_block_idx;
-    gpu_input_.ptr =
-        (char *)gpu_->allocGPUTmpInputBlock(queue_, &new_block_idx);
-    gpu_input_.offset = num_bytes;
+    GPUTmpInputBlock new_block;
+    u32 new_block_idx = gpu_->allocGPUTmpInputBlock(queue_, &new_block);
 
-    ctrl_ |= CommandCtrl::DrawDataBuffer;
-    state_.dataBuffer = new_block_idx;
+    if (gpu_input_.ptr != new_block.ptr) {
+      ctrl_ |= CommandCtrl::DrawDataBuffer;
+      state_.dataBuffer = new_block_idx;
 
-    offset = 0;
+      gpu_input_.ptr = new_block.ptr;
+    }
+
+    gpu_input_.offset = new_block.offset + num_bytes;
+    gpu_input_.endOffset = new_block.endOffset;
+
+    offset = new_block.offset;
   }
 
   ctrl_ |= CommandCtrl::DrawDataOffset;
@@ -168,7 +173,7 @@ void * RasterPassEncoder::drawData(u32 num_bytes, u32 alignment)
 template <typename T>
 T * RasterPassEncoder::drawData()
 {
-  return drawData((u32)sizeof(T), (u32)alignof(T));
+  return (T *)drawData((u32)sizeof(T));
 }
 
 void RasterPassEncoder::draw(u32 vertex_offset, u32 num_triangles)
@@ -714,9 +719,7 @@ CommandEncoder::CommandEncoder(GPURuntime *gpu,
     cmd_writer_(),
     queue_(queue),
     gpu_input_()
-{
-  gpu_input_.blockSize = gpu->getGPUTmpInputBlockSize();
-}
+{}
 
 GPUQueue GPURuntime::getMainQueue()
 {
@@ -738,7 +741,8 @@ void GPURuntime::startEncoding(CommandEncoder &enc)
   enc.cmd_writer_.cmds_ = enc.cmds_head_;
   enc.cmd_writer_.offset_ = 0;
 
-  enc.gpu_input_.offset = enc.gpu_input_.blockSize + 1;
+  enc.gpu_input_.offset = 1;
+  enc.gpu_input_.endOffset = 0;
 }
 
 void GPURuntime::submit(GPUQueue queue, CommandEncoder &enc)

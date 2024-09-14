@@ -375,6 +375,7 @@ struct RasterShaderInit {
   const char *fragmentEntry;
   RasterPassInterfaceID rasterPass;
   Span<const ParamBlockTypeID> paramBlockTypes = {};
+  uint32_t numPerDrawBytes = 0;
   RasterHWConfig rasterConfig = {};
 };
 
@@ -564,12 +565,12 @@ friend class GPURuntime;
 
 struct GPUTmpInputBlock
 {
-  inline u32 alloc(u32 num_bytes, u32 alignment);
+  inline u32 alloc(u32 num_bytes);
   inline bool blockFull() const;
 
-  char *ptr;
+  uint8_t *ptr;
   u32 offset;
-  u32 blockSize;
+  u32 endOffset;
 };
 
 class RasterPassEncoder {
@@ -578,7 +579,7 @@ public:
   inline void setParamBlock(i32 idx, ParamBlock param_block);
   inline void setIndexBuffer(Buffer buffer);
 
-  inline void * drawData(u32 num_bytes, u32 alignment);
+  inline void * drawData(u32 num_bytes);
   template <typename T> T * drawData();
 
   inline void draw(u32 vertex_offset, u32 num_triangles);
@@ -822,9 +823,8 @@ protected:
   FrontendCommands * allocCommandBlock();
   void deallocCommandBlocks(FrontendCommands *cmds);
 
-  virtual void * allocGPUTmpInputBlock(GPUQueue queue,
-                                       u32 *block_idx) = 0;
-  virtual u32 getGPUTmpInputBlockSize() = 0;
+  virtual u32 allocGPUTmpInputBlock(
+      GPUQueue queue, GPUTmpInputBlock *out_block) = 0;
 
 friend class CommandEncoder;
 friend class RasterPassEncoder;

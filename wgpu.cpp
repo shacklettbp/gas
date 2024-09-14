@@ -484,6 +484,16 @@ void WebGPUAPI::destroyRuntime(GPURuntime *runtime)
 {
   auto wgpu_backend = static_cast<Backend *>(runtime);
 
+  for (BackendQueueData &queue_data : wgpu_backend->queueData) {
+    GPUTmpInputState &gpu_tmp_input_state = queue_data.gpuTmpInput;
+
+    for (i32 i = 0; i < (i32)gpu_tmp_input_state.numAllocated; i++) {
+      TmpDynamicUniformData &tmp = gpu_tmp_input_state.buffers[i];
+      tmp.buffer.Destroy();
+      rawDealloc(tmp.ptr);
+    }
+  }
+
   // Hacky, the device lost callback has a pointer
   // to the destroyingDevice member in the WebGPUAPI class,
   // which it checks to see if we're manually destroying this device.
@@ -504,6 +514,40 @@ ShaderByteCodeType WebGPUAPI::backendShaderByteCodeType()
   return ShaderByteCodeType::WGSL;
 }
 
+static TmpDynamicUniformData allocTmpDynamicUniformData(
+    wgpu::Device &dev, wgpu::BindGroupLayout &bind_group_layout)
+{
+  wgpu::BufferDescriptor buffer_desc {
+    .usage = (wgpu::BufferUsage)(
+        wgpu::BufferUsage::Uniform | 
+        wgpu::BufferUsage::CopyDst),
+    .size = TmpDynamicUniformData::BUFFER_SIZE,
+  };
+
+  wgpu::Buffer buffer = dev.CreateBuffer(&buffer_desc);
+
+  wgpu::BindGroupEntry bind_group_entry {
+    .binding = 0,
+    .buffer = buffer,
+    .offset = 0,
+    .size = TmpDynamicUniformData::BLOCK_SIZE,
+  };
+
+  wgpu::BindGroupDescriptor bind_group_desc {
+    .layout = bind_group_layout,
+    .entryCount = 1,
+    .entries = &bind_group_entry,
+  };
+
+  wgpu::BindGroup bind_group = dev.CreateBindGroup(&bind_group_desc);
+
+  return TmpDynamicUniformData {
+    .buffer = buffer,
+    .bindGroup = bind_group,
+    .ptr = (uint8_t *)rawAlloc(TmpDynamicUniformData::BUFFER_SIZE),
+  };
+}
+
 Backend::Backend(wgpu::Adapter &&adapter_in,
                  wgpu::Device &&dev_in,
                  wgpu::Queue &&queue_in,
@@ -515,9 +559,46 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
     queue(std::move(queue_in)),
     inst(inst_in)
 {
-  for (i32 i = 0; i < (i32)queueData.size(); i++) {
-    queueData[i].tmpBuffersHead = 0;
-    queueData[i].tmpBuffersTail = 0;
+  {
+    wgpu::BindGroupLayoutEntry layout_entry {
+      .binding = 0,
+      .visibility = wgpu::ShaderStage((u64)wgpu::ShaderStage::Vertex |
+                                      (u64)wgpu::ShaderStage::Fragment |
+                                      (u64)wgpu::ShaderStage::Compute),
+      .buffer = wgpu::BufferBindingLayout {
+        .type = wgpu::BufferBindingType::Uniform,
+        .hasDynamicOffset = true,
+        .minBindingSize = TmpDynamicUniformData::BLOCK_SIZE,
+      },
+    };
+
+    wgpu::BindGroupLayoutDescriptor layout_desc {
+      .entryCount = 1,
+      .entries = &layout_entry,
+    };
+
+    tmpDynamicUniformLayout = dev.CreateBindGroupLayout(&layout_desc);
+  }
+  
+  // Pre allocate a tmp data block for the main queue
+  {
+    GPUTmpInputState &gpu_tmp_input = queueData[0].gpuTmpInput;
+
+    gpu_tmp_input.buffers[0] = allocTmpDynamicUniformData(
+        dev, tmpDynamicUniformLayout);
+
+    gpu_tmp_input.numAllocated = 1;
+    gpu_tmp_input.curBuffer = 0;
+    gpu_tmp_input.offset = 0;
+  }
+
+  // Initialize other queues with no tmp data initially allocated
+  for (i32 i = 1; i < queueData.size(); i++) {
+    GPUTmpInputState &gpu_tmp_input = queueData[i].gpuTmpInput;
+
+    gpu_tmp_input.numAllocated = 0;
+    gpu_tmp_input.curBuffer = 0;
+    gpu_tmp_input.offset = TmpDynamicUniformData::BUFFER_SIZE;
   }
 }
 
@@ -1243,6 +1324,10 @@ void Backend::createRasterShaders(i32 num_shaders,
         getBindGroupLayoutByParamBlockTypeID(shader_init.paramBlockTypes[i]);
     }
 
+    if (shader_init.numPerDrawBytes > 0) {
+      bind_group_layouts[num_bind_groups++] = tmpDynamicUniformLayout;
+    }
+
     wgpu::PipelineLayoutDescriptor layout_descriptor {
       .bindGroupLayoutCount = (size_t)num_bind_groups,
       .bindGroupLayouts = bind_group_layouts,
@@ -1424,17 +1509,102 @@ void Backend::waitForIdle()
   }
 }
 
-
-void * Backend::allocGPUTmpInputBlock(GPUQueue queue, u32 *block_idx)
+u32 Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl,
+                                   GPUTmpInputBlock *block_out)
 {
-  BackendQueueData &queue_data = queueData[queue.id];
+  GPUTmpInputState &state = queueData[queue_hdl.id].gpuTmpInput;
 
-  return nullptr;
-}
+  state.lock.lock();
 
-u32 Backend::getGPUTmpInputBlockSize()
-{
-  return BackendQueueData::TMP_BLOCK_SIZE;
+  u32 buf_idx = state.curBuffer;
+  u32 buf_offset = state.offset;
+
+  if (buf_offset < TmpDynamicUniformData::BUFFER_SIZE) [[likely]] {
+    TmpDynamicUniformData &cur_tmp = state.buffers[buf_idx];
+    state.offset += TmpDynamicUniformData::BLOCK_SIZE;
+    
+    state.lock.unlock();
+
+    *block_out = {
+      .ptr = cur_tmp.ptr,
+      .offset = buf_offset,
+      .endOffset = buf_offset + TmpDynamicUniformData::BLOCK_SIZE,
+    };
+
+    return buf_idx;
+  }
+
+  buf_idx = ++state.curBuffer;
+  assert(buf_idx < GPUTmpInputState::MAX_BUFFERS);
+
+  if (buf_idx == state.numAllocated) [[unlikely]] {
+    state.buffers[buf_idx] = allocTmpDynamicUniformData(
+        dev, tmpDynamicUniformLayout);
+    state.numAllocated += 1;
+  }
+
+  TmpDynamicUniformData &new_tmp = state.buffers[buf_idx];
+  state.offset = TmpDynamicUniformData::BLOCK_SIZE;
+
+  state.lock.unlock();
+
+  *block_out = {
+    .ptr = new_tmp.ptr,
+    .offset = 0,
+    .endOffset = TmpDynamicUniformData::BLOCK_SIZE,
+  };
+
+  return buf_idx;
+
+#if 0
+  AtomicU32Ref atomic_tail(queue_data.tmpBuffersTail);
+
+  u32 buf_idx, buf_offset;
+  while (true) {
+    buf_idx = atomic_tail.load_acquire();
+
+    if (buf_idx < numAllocatedBuffers) {
+      AtomicU32Ref atomic_offset(queue_data.dynUniformDatas[cur_tail].curOffset);
+
+      buf_offset = atomic_offset.fetch_add_relaxed(
+          BackendQueueData::TMP_BLOCK_SIZE);
+
+      if (buf_offset < BackendQueueData::TMP_BUFFER_SIZE) {
+        break;
+      }
+    } else {
+      queue_data.lock.lock();
+
+      buf_idx = atomic_tail.load_acquire();
+
+      if (buf_idx < numAllocatedBuffers) {
+      }
+    }
+  }
+
+  while (cur_tail >= numAllocatedBuffers) {
+    queue_data.lock.lock();
+
+    cur_tail = tmpBuffersTail;
+
+    if (cur_tail < numAllocatedBuffers) {
+      queue_data.lock.unlock();
+      break;
+    }
+
+    numAllocatedBuffers += 1;
+
+  }
+
+  if (cur_tail >= numAllocatedBuffers) {
+
+    if (cur_tail < numAllocatedBuffers) {
+      queue_data.lock.unlock();
+    } else {
+
+    }
+  }
+#endif
 }
 
 void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
@@ -1443,20 +1613,30 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
   printf("WGPU: begin submit\n");
 #endif
 
-  BackendQueueData &queue_data = queueData[queue_hdl.id]; 
-  {
-    u32 cur_buf_idx = queue_data.tmpBuffersHead;
-    while (cur_buf_idx != queue_data.tmpBuffersTail) {
-      BackendTmpInputGPUBuffer &tmp_buffer =
-        queue_data.gpuTmpBuffers[cur_buf_idx];
-
-      tmp_buffer.buffer.Unmap();
-
-      cur_buf_idx = (cur_buf_idx + 1) % BackendQueueData::MAX_TMP_BUFFERS;
-    }
-  }
-
   wgpu::CommandEncoder wgpu_enc = dev.CreateCommandEncoder();
+
+  GPUTmpInputState &gpu_tmp_input_state = queueData[queue_hdl.id].gpuTmpInput;
+  {
+    for (i32 i = 0; i < (i32)gpu_tmp_input_state.curBuffer; i++) {
+      TmpDynamicUniformData &tmp_dyn_uniform =
+         gpu_tmp_input_state.buffers[i];
+
+      wgpu_enc.WriteBuffer(
+          tmp_dyn_uniform.buffer, 0,
+          tmp_dyn_uniform.ptr, TmpDynamicUniformData::BUFFER_SIZE);
+    }
+
+    if (gpu_tmp_input_state.offset > 0) {
+      TmpDynamicUniformData &tmp_dyn_uniform =
+         gpu_tmp_input_state.buffers[gpu_tmp_input_state.curBuffer];
+
+      wgpu_enc.WriteBuffer(tmp_dyn_uniform.buffer, 0,
+          tmp_dyn_uniform.ptr, gpu_tmp_input_state.offset);
+    }
+
+    gpu_tmp_input_state.curBuffer = 0;
+    gpu_tmp_input_state.offset = 0;
+  }
 
   CommandDecoder decoder(cmds);
 
@@ -1516,6 +1696,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
         wgpu_enc.BeginRenderPass(&pass_descriptor);
 
     wgpu::BindGroup dynamic_tmp_input_bind_group;
+    u32 dynamic_bind_group_idx = 0;
     for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
 #ifdef GAS_WGPU_DEBUG_PRINT
       debugPrintDrawCommandCtrl(ctrl);
@@ -1531,26 +1712,29 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
         if (ParamBlock pb0 = decoder.drawParamBlock0(ctrl); !pb0.null()) {
           pass_enc.SetBindGroup(0, *paramBlocks.hot(pb0));
+          dynamic_bind_group_idx = 1;
         }
 
         if (ParamBlock pb1 = decoder.drawParamBlock1(ctrl); !pb1.null()) {
           pass_enc.SetBindGroup(1, *paramBlocks.hot(pb1));
+          dynamic_bind_group_idx = 2;
         }
 
         if (ParamBlock pb2 = decoder.drawParamBlock2(ctrl); !pb2.null()) {
           pass_enc.SetBindGroup(2, *paramBlocks.hot(pb2));
+          dynamic_bind_group_idx = 3;
         }
 
         if (u32 data_buf_idx = decoder.drawDataBuffer(ctrl);
             data_buf_idx != 0xFFFF'FFFF) {
           dynamic_tmp_input_bind_group =
-              queue_data.gpuTmpBuffers[data_buf_idx].bindGroup;
+              gpu_tmp_input_state.buffers[data_buf_idx].bindGroup;
         }
 
         if (u32 data_offset = decoder.drawDataOffset(ctrl);
             data_offset != 0xFFFF'FFFF) {
-          pass_enc.SetBindGroup(
-              3, dynamic_tmp_input_bind_group, 1, &data_offset);
+          pass_enc.SetBindGroup(dynamic_bind_group_idx,
+                                dynamic_tmp_input_bind_group, 1, &data_offset);
         }
 
         DrawParams draw_params = decoder.drawParams(ctrl);
