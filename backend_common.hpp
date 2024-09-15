@@ -9,6 +9,22 @@
 
 namespace gas {
 
+inline u32 bytesPerTexelForFormat(TextureFormat fmt)
+{
+  using enum TextureFormat;
+
+  switch (fmt) {
+    case None: return 0;
+    case RGBA8_UNorm:
+    case RGBA8_SRGB:
+    case BGRA8_UNorm:
+    case BGRA8_SRGB:
+        return 4;
+    case Depth32_Float: return 4;
+    default: MADRONA_UNREACHABLE();
+  }
+}
+
 template <typename ID, typename Hot, typename Cold>
 struct ResourceTable {
   static constexpr inline i32 MAX_NUM_ELEMS =
@@ -411,13 +427,52 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
   printf("\n");
 }
 
+struct CopyBufferToBufferCmd {
+  Buffer src;
+  Buffer dst;
+  u32 srcOffset;
+  u32 dstOffset;
+  u32 numBytes;
+};
+
+struct CopyBufferToTextureCmd {
+  Buffer src;
+  Texture dst;
+  u32 srcOffset;
+  u32 dstMipLevel;
+};
+
+struct CopyTextureToBufferCmd {
+  Texture src;
+  Buffer dst;
+  u32 srcMipLevel;
+  u32 dstOffset;
+};
+
+struct CopyClearBufferCmd {
+  Buffer buffer;
+  u32 offset;
+  u32 numBytes;
+};
+
 class CommandDecoder {
 public:
   inline CommandDecoder(FrontendCommands *cmds)
     : cmds_(cmds),
       offset_(0),
-      draw_params_()
+      draw_params_(),
+      copy_cmd_()
   {}
+
+  inline void resetDrawParams()
+  {
+    draw_params_ = {};
+  }
+
+  inline void resetCopyCommand()
+  {
+    copy_cmd_ = CopyCommand();
+  }
 
   inline CommandCtrl ctrl() { return (CommandCtrl)next(); }
 
@@ -428,14 +483,9 @@ public:
     return T::fromUInt(v);
   }
 
-  inline void resetDrawParams()
-  {
-    draw_params_ = {};
-  }
-
   inline RasterShader drawShader(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawShader)) {
+    if (t(ctrl, DrawShader)) {
       return id<RasterShader>();
     } else {
       return RasterShader {};
@@ -444,7 +494,7 @@ public:
 
   inline ParamBlock drawParamBlock0(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawParamBlock0)) {
+    if (t(ctrl, DrawParamBlock0)) {
       return id<ParamBlock>();
     } else {
       return ParamBlock {};
@@ -453,7 +503,7 @@ public:
 
   inline ParamBlock drawParamBlock1(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawParamBlock1)) {
+    if (t(ctrl, DrawParamBlock1)) {
       return id<ParamBlock>();
     } else {
       return ParamBlock {};
@@ -462,7 +512,7 @@ public:
 
   inline ParamBlock drawParamBlock2(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawParamBlock2)) {
+    if (t(ctrl, DrawParamBlock2)) {
       return id<ParamBlock>();
     } else {
       return ParamBlock {};
@@ -471,7 +521,7 @@ public:
 
   inline Buffer drawDataBuffer(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawDataBuffer)) {
+    if (t(ctrl, DrawDataBuffer)) {
       return id<Buffer>();
     } else {
       return {};
@@ -480,7 +530,7 @@ public:
 
   inline u32 drawDataOffset(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawDataOffset)) {
+    if (t(ctrl, DrawDataOffset)) {
       return next();
     } else {
       return 0xFFFF'FFFF;
@@ -489,7 +539,7 @@ public:
 
   inline Buffer drawVertexBuffer0(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawVertexBuffer0)) {
+    if (t(ctrl, DrawVertexBuffer0)) {
       return id<Buffer>();
     } {
       return {};
@@ -507,7 +557,7 @@ public:
 
   inline Buffer drawIndexBuffer32(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawIndexBuffer32)) {
+    if (t(ctrl, DrawIndexBuffer32)) {
       return id<Buffer>();
     } {
       return {};
@@ -516,14 +566,14 @@ public:
 
   inline Buffer drawIndexBuffer16(CommandCtrl ctrl)
   {
-    if (t(ctrl, CommandCtrl::DrawIndexBuffer16)) {
+    if (t(ctrl, DrawIndexBuffer16)) {
       return id<Buffer>();
     } {
       return {};
     }
   }
 
-  DrawParams drawParams(CommandCtrl ctrl)
+  inline DrawParams drawParams(CommandCtrl ctrl)
   {
     if (t(ctrl, DrawIndexOffset)) {
       draw_params_.indexOffset = next();
@@ -546,6 +596,110 @@ public:
     }
 
     return draw_params_;
+  }
+
+  inline CopyBufferToBufferCmd copyBufferToBuffer(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CopyB2BSrcBuffer)) {
+      copy_cmd_.data[0] = next();
+    }
+
+    if (t(ctrl, CopyB2BDstBuffer)) {
+      copy_cmd_.data[1] = next();
+    }
+
+    if (t(ctrl, CopyB2BSrcOffset)) {
+      copy_cmd_.data[2] = next();
+    }
+    
+    if (t(ctrl, CopyB2BDstOffset)) {
+      copy_cmd_.data[3] = next();
+    }
+
+    if (t(ctrl, CopyB2BNumBytes)) {
+      copy_cmd_.data[4] = next();
+    }
+
+    return {
+      .src = Buffer::fromUInt(copy_cmd_.data[0]),
+      .dst = Buffer::fromUInt(copy_cmd_.data[1]),
+      .srcOffset = copy_cmd_.data[2],
+      .dstOffset = copy_cmd_.data[3],
+      .numBytes = copy_cmd_.data[4],
+    };
+  }
+
+  inline CopyBufferToTextureCmd copyBufferToTexture(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CopyB2TSrcBuffer)) {
+      copy_cmd_.data[0] = next();
+    }
+
+    if (t(ctrl, CopyB2TDstTexture)) {
+      copy_cmd_.data[1] = next();
+    }
+
+    if (t(ctrl, CopyB2TSrcOffset)) {
+      copy_cmd_.data[2] = next();
+    }
+    
+    if (t(ctrl, CopyB2TDstMipLevel)) {
+      copy_cmd_.data[3] = next();
+    }
+
+    return {
+      .src = Buffer::fromUInt(copy_cmd_.data[0]),
+      .dst = Texture::fromUInt(copy_cmd_.data[1]),
+      .srcOffset = copy_cmd_.data[2],
+      .dstMipLevel = copy_cmd_.data[3],
+    };
+  }
+
+  inline CopyTextureToBufferCmd copyTextureToBuffer(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CopyT2BSrcTexture)) {
+      copy_cmd_.data[0] = next();
+    }
+
+    if (t(ctrl, CopyT2BDstBuffer)) {
+      copy_cmd_.data[1] = next();
+    }
+
+    if (t(ctrl, CopyT2BSrcMipLevel)) {
+      copy_cmd_.data[2] = next();
+    }
+    
+    if (t(ctrl, CopyT2BDstOffset)) {
+      copy_cmd_.data[3] = next();
+    }
+
+    return {
+      .src = Texture::fromUInt(copy_cmd_.data[0]),
+      .dst = Buffer::fromUInt(copy_cmd_.data[1]),
+      .srcMipLevel = copy_cmd_.data[2],
+      .dstOffset = copy_cmd_.data[3],
+    };
+  }
+
+  inline CopyClearBufferCmd copyClear(CommandCtrl ctrl)
+  {
+    if (t(ctrl, CopyClearBuffer)) {
+      copy_cmd_.data[0] = next();
+    }
+
+    if (t(ctrl, CopyClearOffset)) {
+      copy_cmd_.data[1] = next();
+    }
+
+    if (t(ctrl, CopyClearNumBytes)) {
+      copy_cmd_.data[2] = next();
+    }
+    
+    return {
+      .buffer = Buffer::fromUInt(copy_cmd_.data[0]),
+      .offset = copy_cmd_.data[1],
+      .numBytes = copy_cmd_.data[2],
+    };
   }
 
 private:
@@ -571,6 +725,7 @@ private:
   FrontendCommands *cmds_;
   i32 offset_;
   DrawParams draw_params_;
+  CopyCommand copy_cmd_;
 };
 
 class BackendCommon : public GPURuntime {

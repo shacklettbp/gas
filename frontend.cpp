@@ -91,7 +91,6 @@ int main(int argc, char *argv[])
 
   RasterPassInterface onscreen_pass_iface = gpu->createRasterPassInterface({
     .uuid = "test_pass"_to_uuid,
-    .depthAttachment = { .format = TextureFormat::None },
     .colorAttachments = {
       { .format = swapchain_properties.format },
     },
@@ -131,7 +130,7 @@ int main(int argc, char *argv[])
       gpu->acquireSwapchainImage(swapchain);
     assert(swapchain_status == SwapchainStatus::Valid);
 
-    gpu->startEncoding(enc);
+    enc.beginEncoding();
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(onscreen_pass);
 
@@ -146,6 +145,7 @@ int main(int argc, char *argv[])
 
       enc.endRasterPass(raster_enc);
     }
+    enc.endEncoding();
     gpu->submit(main_queue, enc);
 
     gpu->presentSwapchainImage(swapchain);

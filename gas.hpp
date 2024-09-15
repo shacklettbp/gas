@@ -319,7 +319,7 @@ enum class AttachmentStoreMode : u16 {
 };
 
 struct DepthAttachmentConfig {
-  TextureFormat format = TextureFormat::Depth32_Float;
+  TextureFormat format = TextureFormat::None;
   AttachmentLoadMode loadMode = AttachmentLoadMode::Clear;
   AttachmentStoreMode storeMode = AttachmentStoreMode::Store;
   float clearValue = 0.f;
@@ -458,7 +458,7 @@ enum class CommandCtrl : u32 {
   CopyBufferToBuffer  = 1 << 0,
   CopyBufferToTexture = 1 << 1,
   CopyTextureToBuffer = 1 << 2,
-  CopyBufferFill      = 1 << 3,
+  CopyBufferClear     = 1 << 3,
 
   CopyB2BSrcBuffer    = 1 << 4,
   CopyB2BDstBuffer    = 1 << 5,
@@ -469,17 +469,16 @@ enum class CommandCtrl : u32 {
   CopyB2TSrcBuffer    = 1 << 4,
   CopyB2TDstTexture   = 1 << 5,
   CopyB2TSrcOffset    = 1 << 6,
-  CopyB2TDstMipSlice  = 1 << 7,
+  CopyB2TDstMipLevel  = 1 << 7,
 
   CopyT2BSrcTexture   = 1 << 4,
   CopyT2BDstBuffer    = 1 << 5,
-  CopyT2BSrcMipSlice  = 1 << 6,
+  CopyT2BSrcMipLevel  = 1 << 6,
   CopyT2BDstOffset    = 1 << 7,
 
-  CopyFillBuffer      = 1 << 4,
-  CopyFillOffset      = 1 << 5,
-  CopyFillNumBytes    = 1 << 6,
-  CopyFillValue       = 1 << 7,
+  CopyClearBuffer     = 1 << 4,
+  CopyClearOffset     = 1 << 5,
+  CopyClearNumBytes   = 1 << 6,
 };
 inline CommandCtrl & operator|=(CommandCtrl &a, CommandCtrl b);
 inline CommandCtrl operator|(CommandCtrl a, CommandCtrl b);
@@ -509,44 +508,10 @@ struct ComputeCommand {
 };
 
 struct CopyCommand {
-  struct BufferToBuffer {
-    Buffer src = {};
-    Buffer dst = {};
-
-    u32 srcOffset = 0;
-    u32 dstOffset = 0;
-    u32 numBytes = 0;
-  };
-
-  struct BufferToTexture {
-    Buffer src = {};
-    Texture dst = {};
-    u32 srcOffset = 0;
-    u32 dstMipSlice = 1;
-  };
-
-  struct TextureToBuffer {
-    Texture src = {};
-    Buffer dst = {};
-    u32 srcMipSlice = 1;
-    u32 dstOffset = 0;
-  };
-
-  struct FillBuffer {
-    Buffer buffer;
-    u32 offset = 0;
-    u32 numBytes = 0;
-    u32 value = 0;
-  };
-
-  union {
-    BufferToBuffer b2b;
-    BufferToTexture b2t;
-    TextureToBuffer t2b;
-    FillBuffer fill;
-  };
-
   inline CopyCommand();
+  // Due to strict aliasing rules we can't use a union over the different
+  // sub commands to track data changes
+  std::array<u32, 5> data;
 };
 
 // Used by backends
@@ -559,6 +524,7 @@ static_assert(sizeof(FrontendCommands) == 4096);
 
 class CommandWriter {
 public:
+  inline u32 * reserve(GPURuntime *gpu);
   inline void writeU32(GPURuntime *gpu, u32 v);
 
   template <typename T>
@@ -641,15 +607,13 @@ public:
 
   inline void copyBufferToTexture(Buffer src, Texture dst,
                                   u32 src_offset = 0,
-                                  u32 dst_mip_offset = 0,
-                                  u32 dst_num_mips = 1);
+                                  u32 dst_mip_level = 0);
 
   inline void copyTextureToBuffer(Texture src, Buffer dst,
-                                  u32 src_mip_offset = 0,
-                                  u32 src_num_mips = 1,
+                                  u32 src_mip_level = 0,
                                   u32 dst_offset = 0);
 
-  inline void fillBuffer(Buffer buffer, u32 offset, u32 num_bytes, u32 v);
+  inline void clearBuffer(Buffer buffer, u32 offset, u32 num_bytes);
 
 private:
   inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer);
@@ -664,6 +628,9 @@ friend class CommandEncoder;
 
 class CommandEncoder {
 public:
+  inline void beginEncoding();
+  inline void endEncoding();
+
   inline RasterPassEncoder beginRasterPass(RasterPass render_pass);
   inline void endRasterPass(RasterPassEncoder &render_enc);
 
@@ -820,7 +787,6 @@ public:
   inline CommandEncoder createCommandEncoder(GPUQueue queue);
   inline void destroyCommandEncoder(CommandEncoder &encoder);
 
-  inline void startEncoding(CommandEncoder &enc);
   inline void submit(GPUQueue queue, CommandEncoder &enc);
 
   virtual void waitUntilReady(GPUQueue queue) = 0;

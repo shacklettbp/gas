@@ -22,6 +22,10 @@ struct BackendTexture {
 
 struct BackendTextureCold {
   wgpu::Texture texture;
+  u32 baseWidth;
+  u32 baseHeight;
+  u32 baseDepth;
+  u32 numBytesPerTexel;
 };
 
 struct BackendParamBlockType {

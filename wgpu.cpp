@@ -726,6 +726,10 @@ void Backend::createGPUResources(i32 num_buffers,
 
     new (to_cold) BackendTextureCold {
       .texture = std::move(wgpu_tex),
+      .baseWidth = tex_desc.size.width,
+      .baseHeight = tex_desc.size.height,
+      .baseDepth = tex_desc.size.depthOrArrayLayers,
+      .numBytesPerTexel = bytesPerTexelForFormat(tex_init.format),
     };
 
     new (to_hot) BackendTexture {
@@ -1815,6 +1819,116 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
     pass_enc.End();
   };
+   
+  auto encodeCopyPass = [&]()
+  {
+    decoder.resetCopyCommand();
+
+    for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
+      CommandCtrl ctrl_masked = ctrl & 
+          (CommandCtrl::CopyBufferToBuffer |
+           CommandCtrl::CopyBufferToTexture |
+           CommandCtrl::CopyTextureToBuffer |
+           CommandCtrl::CopyBufferClear);
+      switch (ctrl_masked) {
+        case CommandCtrl::CopyBufferToBuffer: {
+          CopyBufferToBufferCmd b2b =
+              decoder.copyBufferToBuffer(ctrl);
+
+          wgpu_enc.CopyBufferToBuffer(*buffers.hot(b2b.src), b2b.srcOffset,
+                                      *buffers.hot(b2b.dst), b2b.dstOffset,
+                                      b2b.numBytes);
+        } break;
+        case CommandCtrl::CopyBufferToTexture: {
+          CopyBufferToTextureCmd b2t =
+              decoder.copyBufferToTexture(ctrl);
+
+          BackendTextureCold *to_tex_data;
+          {
+            if (!textures.hot(b2t.dst)) [[unlikely]] {
+              to_tex_data = nullptr;
+            }
+            to_tex_data = textures.cold(b2t.dst);
+          }
+
+          u32 mip0_width = to_tex_data->baseWidth;
+          u32 mip0_height = to_tex_data->baseHeight;
+          u32 mip0_depth = to_tex_data->baseDepth;
+              
+          u32 width = std::max(mip0_width >> b2t.dstMipLevel, 1_u32);
+          u32 height = std::max(mip0_height >> b2t.dstMipLevel, 1_u32);
+          u32 depth = std::max(mip0_depth >> b2t.dstMipLevel, 1_u32);
+
+          wgpu::ImageCopyBuffer src {
+            .layout = {
+              .offset = b2t.srcOffset,
+            },
+            .buffer = *buffers.hot(b2t.src),
+          };
+
+          wgpu::ImageCopyTexture dst {
+            .texture = to_tex_data->texture,
+            .mipLevel = b2t.dstMipLevel,
+          };
+
+          wgpu::Extent3D copy_size {
+            .width = width,
+            .height = height,
+            .depthOrArrayLayers = depth,
+          };
+
+          wgpu_enc.CopyBufferToTexture(&src, &dst, &copy_size);
+        } break;
+        case CommandCtrl::CopyTextureToBuffer: {
+          CopyTextureToBufferCmd t2b =
+              decoder.copyTextureToBuffer(ctrl);
+
+          BackendTextureCold *to_tex_data;
+          {
+            if (!textures.hot(t2b.src)) [[unlikely]] {
+              to_tex_data = nullptr;
+            }
+            to_tex_data = textures.cold(t2b.src);
+          }
+
+          u32 mip0_width = to_tex_data->baseWidth;
+          u32 mip0_height = to_tex_data->baseHeight;
+          u32 mip0_depth = to_tex_data->baseDepth;
+              
+          u32 width = std::max(mip0_width >> t2b.srcMipLevel, 1_u32);
+          u32 height = std::max(mip0_height >> t2b.srcMipLevel, 1_u32);
+          u32 depth = std::max(mip0_depth >> t2b.srcMipLevel, 1_u32);
+
+          wgpu::ImageCopyTexture src {
+            .texture = to_tex_data->texture,
+            .mipLevel = t2b.srcMipLevel,
+          };
+
+          wgpu::ImageCopyBuffer dst {
+            .layout = {
+              .offset = t2b.dstOffset,
+            },
+            .buffer = *buffers.hot(t2b.dst),
+          };
+
+          wgpu::Extent3D copy_size {
+            .width = width,
+            .height = height,
+            .depthOrArrayLayers = depth,
+          };
+
+          wgpu_enc.CopyTextureToBuffer(&src, &dst, &copy_size);
+        } break;
+        case CommandCtrl::CopyBufferClear: {
+          CopyClearBufferCmd clear = decoder.copyClear(ctrl);
+
+          wgpu_enc.ClearBuffer(*buffers.hot(clear.buffer), clear.offset,
+                               clear.numBytes);
+        } break;
+        default: MADRONA_UNREACHABLE();
+      }
+    }
+  };
 
   for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
     switch (ctrl) {
@@ -1824,6 +1938,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
       case CommandCtrl::ComputePass: {
       } break;
       case CommandCtrl::CopyPass: {
+        encodeCopyPass();
       } break;
       default: MADRONA_UNREACHABLE();
     }
