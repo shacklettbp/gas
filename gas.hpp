@@ -822,7 +822,9 @@ public:
 
   inline void startEncoding(CommandEncoder &enc);
   inline void submit(GPUQueue queue, CommandEncoder &enc);
-  virtual void waitForIdle() = 0;
+
+  virtual void waitUntilReady(GPUQueue queue) = 0;
+  virtual void waitUntilIdle() = 0;
 
   // ==== Swapchain & presentation ============================================
   virtual Swapchain createSwapchain(Surface surface,

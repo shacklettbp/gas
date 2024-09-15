@@ -74,7 +74,9 @@ struct BackendRasterPass {
 struct NoMetadata {};
 
 struct TmpDynamicUniformData {
-  static constexpr inline u32 BUFFER_SIZE = 128 * 1024 * 1024;
+  static constexpr inline u32 BUFFER_SIZE = 64 * 1024 * 1024;
+  static constexpr inline u32 NUM_BLOCKS =
+      BUFFER_SIZE / GPUTmpInputBlock::BLOCK_SIZE;
 
   wgpu::BindGroup bindGroup;
   uint8_t *ptr;
@@ -85,15 +87,16 @@ struct GPUTmpInputState {
 
   std::array<TmpDynamicUniformData, MAX_BUFFERS> buffers;
   u32 bufferHandlesBase;
-  u32 numAllocated;
-  u32 curBuffer;
 
-  alignas(MADRONA_CACHE_LINE) u32 offset;
+  alignas(MADRONA_CACHE_LINE) u64 curFreeRange;
+
   SpinLock lock {};
 };
 
 struct BackendQueueData {
-  GPUTmpInputState gpuTmpInput;
+  GPUTmpInputState gpuTmpInput[2];
+  i32 curFrame;
+  i32 numFrames;
 };
 
 class WebGPUAPI final : public GPUAPI {
@@ -178,7 +181,7 @@ public:
   BackendLimits limits;
 
   wgpu::BindGroupLayout tmpDynamicUniformLayout;
-  std::array<BackendQueueData, 2> queueData;
+  std::array<BackendQueueData, 2> queueDatas;
 
   BufferTable buffers {};
   TextureTable textures {};
@@ -279,7 +282,9 @@ public:
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;
   void presentSwapchainImage(Swapchain swapchain) final;
 
-  void waitForIdle() final;
+  void waitUntilReady(GPUQueue queue_hdl) final;
+
+  void waitUntilIdle() final;
 
   GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
 

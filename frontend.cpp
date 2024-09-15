@@ -125,6 +125,8 @@ int main(int argc, char *argv[])
       }
     }
 
+    gpu->waitUntilReady(main_queue);
+
     auto [swapchain_tex, swapchain_status] =
       gpu->acquireSwapchainImage(swapchain);
     assert(swapchain_status == SwapchainStatus::Valid);
@@ -150,7 +152,10 @@ int main(int argc, char *argv[])
 
     frame_num += 1;
   }
-  gpu->waitForIdle();
+
+  gpu->waitUntilReady(main_queue);
+
+  gpu->waitUntilIdle();
 
   gpu->destroyCommandEncoder(enc);
 
