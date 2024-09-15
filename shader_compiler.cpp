@@ -450,6 +450,12 @@ GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler * gasCreateShaderCompiler()
   return ::gas::CompilerBackend::init();
 }
 
+GAS_SHADER_COMPILER_VIS void
+    gasDestroyShaderCompiler(::gas::ShaderCompiler *shaderc)
+{
+  delete shaderc;
+}
+
 GAS_SHADER_COMPILER_VIS void gasStartupShaderCompilerLib()
 {
 #ifdef GAS_SUPPORT_WEBGPU

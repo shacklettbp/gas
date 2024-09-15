@@ -76,6 +76,9 @@ extern "C" {
 GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler *
     gasCreateShaderCompiler();
 
+GAS_SHADER_COMPILER_VIS void
+    gasDestroyShaderCompiler(::gas::ShaderCompiler *);
+
 GAS_SHADER_COMPILER_VIS void gasStartupShaderCompilerLib();
 GAS_SHADER_COMPILER_VIS void gasShutdownShaderCompilerLib();
 

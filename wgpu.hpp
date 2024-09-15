@@ -71,6 +71,11 @@ struct BackendRasterPass {
   Swapchain swapchain;
 };
 
+struct BackendRasterShader {
+  wgpu::RenderPipeline pipeline;
+  i32 perDrawBindGroupSlot;
+};
+
 struct NoMetadata {};
 
 struct TmpDynamicUniformData {
@@ -162,7 +167,7 @@ using RasterPassTable = ResourceTable<
 
 using RasterShaderTable = ResourceTable<
     RasterShader,
-    wgpu::RenderPipeline,
+    gas::webgpu::BackendRasterShader,
     NoMetadata
   >;
 

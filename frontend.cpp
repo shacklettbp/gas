@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     shader_bytecode =
         compile_result.getByteCodeForBackend(backend_bytecode_type);
 
-    delete shaderc;
+    shaderc_lib.destroyCompiler(shaderc);
   }
 
   GPURuntime *gpu = gpu_api->createRuntime(0, {window->surface});

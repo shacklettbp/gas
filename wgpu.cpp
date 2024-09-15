@@ -402,6 +402,17 @@ void WebGPUAPI::destroySurface(Surface surface)
   wgpuSurfaceRelease((WGPUSurface)surface.hdl.ptr);
 } 
 
+static wgpu::WaitStatus busyWaitForFuture(
+    wgpu::Instance &inst, wgpu::Future future)
+{
+  wgpu::WaitStatus wait_status;
+  while ((wait_status = inst.WaitAny(future, 0)) ==
+          wgpu::WaitStatus::TimedOut)
+  {}
+
+  return wait_status;
+}
+
 static InitDeviceResult initDevice(
   WebGPUAPI *api, i32 idx, Span<const Surface> surfaces)
 {
@@ -433,8 +444,7 @@ static InitDeviceResult initDevice(
        *out_adapter = returned_adapter;
       }, &adapter);
 
-    wgpu::WaitStatus wait_status = api->inst.WaitAny(future, 0);
-
+    wgpu::WaitStatus wait_status = busyWaitForFuture(api->inst, future);
     if (wait_status != wgpu::WaitStatus::Success) {
       FATAL("Requesting adapter failed during wait: %d", (int)wait_status);
     }
@@ -474,7 +484,7 @@ static InitDeviceResult initDevice(
         *out_device = returned_device;
       }, &device);
 
-    wgpu::WaitStatus wait_status = api->inst.WaitAny(future, 0);
+    wgpu::WaitStatus wait_status = busyWaitForFuture(api->inst, future);
 
     if (wait_status != wgpu::WaitStatus::Success) {
       FATAL("Requesting device failed during wait");
@@ -800,7 +810,7 @@ void Backend::prepareStagingBuffers(i32 num_buffers,
         wgpu::MapMode::Write, 0, WGPU_WHOLE_SIZE,
         wgpu::CallbackMode::WaitAnyOnly, map_cb, (void *)nullptr);
 
-    wgpu::WaitStatus map_wait_status = inst.WaitAny(map_future, 0);
+    wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
     assert(map_wait_status == wgpu::WaitStatus::Success);
 
     mapped_out[buf_idx] = to_buffer->GetMappedRange();
@@ -1338,8 +1348,10 @@ void Backend::createRasterShaders(i32 num_shaders,
         getBindGroupLayoutByParamBlockTypeID(shader_init.paramBlockTypes[i]);
     }
 
+    i32 per_draw_bind_group_slot = -1;
     if (shader_init.numPerDrawBytes > 0) {
-      bind_group_layouts[num_bind_groups++] = tmpDynamicUniformLayout;
+      per_draw_bind_group_slot = num_bind_groups++;
+      bind_group_layouts[per_draw_bind_group_slot] = tmpDynamicUniformLayout;
     }
 
     wgpu::PipelineLayoutDescriptor layout_descriptor {
@@ -1362,8 +1374,11 @@ void Backend::createRasterShaders(i32 num_shaders,
 
     wgpu::RenderPipeline pipeline = dev.CreateRenderPipeline(&pipeline_desc);
 
-    auto [to_pipeline, _, id] = rasterShaders.get(tbl_offset, shader_idx);
-    new (to_pipeline) wgpu::RenderPipeline(std::move(pipeline));
+    auto [out, _, id] = rasterShaders.get(tbl_offset, shader_idx);
+    new (out) BackendRasterShader {
+      .pipeline = std::move(pipeline),
+      .perDrawBindGroupSlot = per_draw_bind_group_slot,
+    };
     handles_out[shader_idx] = id;
   }
 }
@@ -1371,9 +1386,9 @@ void Backend::createRasterShaders(i32 num_shaders,
 void Backend::destroyRasterShaders(i32 num_shaders, RasterShader *handles)
 {
   rasterShaders.releaseResources(num_shaders, handles,
-    [](wgpu::RenderPipeline *to_pipeline, auto)
+    [](BackendRasterShader *to_shader, auto)
   {
-    to_pipeline->~RenderPipeline();
+    to_shader->~BackendRasterShader();
   });
 }
 
@@ -1523,11 +1538,15 @@ void Backend::waitUntilIdle()
 
   wgpu::Future future = queue.OnSubmittedWorkDone(
       wgpu::CallbackMode::WaitAnyOnly, workDoneCB);
-  wgpu::WaitStatus wait_status = inst.WaitAny(future, 0);
 
-  if (wait_status != wgpu::WaitStatus::Success ||
-      queue_status != wgpu::QueueWorkDoneStatus::Success) {
-    FATAL("Error in wgpu waitForIdle()");
+  wgpu::WaitStatus wait_status = busyWaitForFuture(inst, future);
+  if (wait_status != wgpu::WaitStatus::Success) {
+    FATAL("WebGPU backend waitUntilIdle: error while waiting for work done callback: %lu", (u64)wait_status);
+  }
+
+  if (queue_status != wgpu::QueueWorkDoneStatus::Success) {
+    FATAL("WebGPU backend waitUntilIdle: work done callback failure: %lu",
+         (u64)queue_status);
   }
 }
 
@@ -1708,7 +1727,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
         wgpu_enc.BeginRenderPass(&pass_descriptor);
 
     wgpu::BindGroup dynamic_tmp_input_bind_group;
-    u32 dynamic_bind_group_idx = 0;
+    i32 dynamic_bind_group_idx = -1;
     for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
 #ifdef GAS_WGPU_DEBUG_PRINT
       debugPrintDrawCommandCtrl(ctrl);
@@ -1719,22 +1738,21 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
         (ctrl & CommandCtrl::DrawIndexed) != CommandCtrl::None;
       if (draw || indexed_draw) {
         if (RasterShader shader = decoder.drawShader(ctrl); !shader.null()) {
-          pass_enc.SetPipeline(*rasterShaders.hot(shader));
+          BackendRasterShader *to_raster_shader = rasterShaders.hot(shader);
+          pass_enc.SetPipeline(to_raster_shader->pipeline);
+          dynamic_bind_group_idx = to_raster_shader->perDrawBindGroupSlot;
         }
 
         if (ParamBlock pb0 = decoder.drawParamBlock0(ctrl); !pb0.null()) {
           pass_enc.SetBindGroup(0, *paramBlocks.hot(pb0));
-          dynamic_bind_group_idx = 1;
         }
 
         if (ParamBlock pb1 = decoder.drawParamBlock1(ctrl); !pb1.null()) {
           pass_enc.SetBindGroup(1, *paramBlocks.hot(pb1));
-          dynamic_bind_group_idx = 2;
         }
 
         if (ParamBlock pb2 = decoder.drawParamBlock2(ctrl); !pb2.null()) {
           pass_enc.SetBindGroup(2, *paramBlocks.hot(pb2));
-          dynamic_bind_group_idx = 3;
         }
 
         if (Buffer data_buf = decoder.drawDataBuffer(ctrl); !data_buf.null()) {

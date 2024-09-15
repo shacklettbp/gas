@@ -857,6 +857,7 @@ public:
 struct ShaderCompilerLib {
   void *hdl;
   ShaderCompiler * (*createCompiler)();
+  void (*destroyCompiler)(ShaderCompiler *shaderc);
 };
 
 class GPUAPI {
@@ -867,7 +868,7 @@ public:
   virtual void destroySurface(Surface surface) = 0;
 
   virtual GPURuntime * createRuntime(
-    i32 gpu_idx, Span<const Surface> surfaces) = 0;
+    i32 gpu_idx, Span<const Surface> surfaces = {}) = 0;
   virtual void destroyRuntime(GPURuntime *runtime) = 0;
 
   virtual void processGraphicsEvents() = 0;

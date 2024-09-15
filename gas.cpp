@@ -218,14 +218,16 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
 
   auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
       handle, "gasCreateShaderCompiler");
+  auto destroy_fn = (void (*)(ShaderCompiler *))GetProcAddress(
+      lib, "gasDestroyShaderCompiler");
 
-  if (!create_fn) {
-    FATAL("Failed to find create function in shader compiler library: %u",
+  if (!create_fn || !destroy_fn) {
+    FATAL("Failed to find create / destroy functions in shader compiler library: %u",
           GetLastError());
   }
 
   // Return the handle and the create function
-  return { handle, create_fn };
+  return { handle, create_fn, destroy_fn };
 #elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
 #ifdef MADRONA_LINUX
   const char *lib_name = "libgas_shader_compiler.so";
@@ -249,12 +251,14 @@ ShaderCompilerLib GPUAPI::loadShaderCompiler()
 
   auto create_fn = (ShaderCompiler * (*)())dlsym(
       lib, "gasCreateShaderCompiler");
-  if (!create_fn) {
-    FATAL("Failed to find create function in shader compiler library: %s",
+  auto destroy_fn = (void (*)(ShaderCompiler *))dlsym(
+      lib, "gasDestroyShaderCompiler");
+  if (!create_fn || !destroy_fn) {
+    FATAL("Failed to find create /destroy functions in shader compiler library: %s",
           dlerror());
   }
 
-  return { lib, create_fn };
+  return { lib, create_fn, destroy_fn };
 #else 
   FATAL("Shader compiler not supported");
 #endif
