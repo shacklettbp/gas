@@ -835,18 +835,73 @@ void Backend::flushStagingBuffers(i32 num_buffers, Buffer *buffer_hdls)
   }
 }
 
-Buffer Backend::createReadbackBuffer(u32 num_bytes, void **mapped_out)
+Buffer Backend::createReadbackBuffer(u32 num_bytes)
 {
-  (void)num_bytes;
-  (void)mapped_out;
-  FATAL("Unimplemented");
+  u32 tbl_offset = buffers.reserveRows(1);
+  if (tbl_offset == AllocOOM) [[unlikely]] {
+    reportError(ErrorStatus::TableFull);
+    return {};
+  }
+
+  wgpu::BufferDescriptor buf_desc {
+    .usage = (wgpu::BufferUsage)(
+        (u64)wgpu::BufferUsage::MapRead |
+        (u64)wgpu::BufferUsage::CopyDst),
+    .size = num_bytes,
+  };
+
+  auto [to_hot, to_cold, id] = buffers.get(tbl_offset, 0);
+
+  new (to_hot) wgpu::Buffer(dev.CreateBuffer(&buf_desc));
+  *to_cold = {};
+
+  return id;
 }
 
-void Backend::destroyReadbackBuffer(Buffer readback, void *mapped)
+void Backend::destroyReadbackBuffer(Buffer buffer)
 {
-  (void)readback;
-  (void)mapped;
-  FATAL("Unimplemented");
+  buffers.releaseResources(1, &buffer,
+    [](wgpu::Buffer *to_buf, auto)
+  {
+    to_buf->Destroy();
+    to_buf->~Buffer();
+  });
+}
+
+void * Backend::beginReadback(Buffer buffer)
+{
+  wgpu::Buffer *to_buffer = buffers.hot(buffer);
+
+  wgpu::MapAsyncStatus map_status;
+  auto map_cb = [](wgpu::MapAsyncStatus status, char const *,
+                   wgpu::MapAsyncStatus *out)
+  {
+    *out = status;
+  };
+
+  wgpu::Future map_future = to_buffer->MapAsync(
+      wgpu::MapMode::Read, 0, WGPU_WHOLE_SIZE,
+      wgpu::CallbackMode::WaitAnyOnly, map_cb, &map_status);
+
+  wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
+  if (map_wait_status != wgpu::WaitStatus::Success) {
+    FATAL("Failed to wait while mapping readback buffer: %lu",
+          (u64)map_wait_status);
+  }
+
+  if (map_status != wgpu::MapAsyncStatus::Success) {
+    FATAL("Failed to map readback buffer: %lu",
+          (u64)map_wait_status);
+  }
+
+  assert(to_buffer->GetMapState() == wgpu::BufferMapState::Mapped);
+
+  return to_buffer->GetMappedRange();
+}
+
+void Backend::endReadback(Buffer buffer)
+{
+  buffers.hot(buffer)->Unmap();
 }
  
 Buffer Backend::createStandaloneBuffer(BufferInit init, bool external_export)
@@ -1826,12 +1881,12 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
     for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
       CommandCtrl ctrl_masked = ctrl & 
-          (CommandCtrl::CopyBufferToBuffer |
-           CommandCtrl::CopyBufferToTexture |
-           CommandCtrl::CopyTextureToBuffer |
-           CommandCtrl::CopyBufferClear);
+          (CommandCtrl::CopyCmdBufferToBuffer |
+           CommandCtrl::CopyCmdBufferToTexture |
+           CommandCtrl::CopyCmdTextureToBuffer |
+           CommandCtrl::CopyCmdBufferClear);
       switch (ctrl_masked) {
-        case CommandCtrl::CopyBufferToBuffer: {
+        case CommandCtrl::CopyCmdBufferToBuffer: {
           CopyBufferToBufferCmd b2b =
               decoder.copyBufferToBuffer(ctrl);
 
@@ -1839,7 +1894,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
                                       *buffers.hot(b2b.dst), b2b.dstOffset,
                                       b2b.numBytes);
         } break;
-        case CommandCtrl::CopyBufferToTexture: {
+        case CommandCtrl::CopyCmdBufferToTexture: {
           CopyBufferToTextureCmd b2t =
               decoder.copyBufferToTexture(ctrl);
 
@@ -1854,6 +1909,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           u32 mip0_width = to_tex_data->baseWidth;
           u32 mip0_height = to_tex_data->baseHeight;
           u32 mip0_depth = to_tex_data->baseDepth;
+          u32 bytes_per_texel = to_tex_data->numBytesPerTexel;
               
           u32 width = std::max(mip0_width >> b2t.dstMipLevel, 1_u32);
           u32 height = std::max(mip0_height >> b2t.dstMipLevel, 1_u32);
@@ -1862,6 +1918,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           wgpu::ImageCopyBuffer src {
             .layout = {
               .offset = b2t.srcOffset,
+              .bytesPerRow = width * bytes_per_texel,
             },
             .buffer = *buffers.hot(b2t.src),
           };
@@ -1879,7 +1936,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
           wgpu_enc.CopyBufferToTexture(&src, &dst, &copy_size);
         } break;
-        case CommandCtrl::CopyTextureToBuffer: {
+        case CommandCtrl::CopyCmdTextureToBuffer: {
           CopyTextureToBufferCmd t2b =
               decoder.copyTextureToBuffer(ctrl);
 
@@ -1894,6 +1951,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           u32 mip0_width = to_tex_data->baseWidth;
           u32 mip0_height = to_tex_data->baseHeight;
           u32 mip0_depth = to_tex_data->baseDepth;
+          u32 bytes_per_texel = to_tex_data->numBytesPerTexel;
               
           u32 width = std::max(mip0_width >> t2b.srcMipLevel, 1_u32);
           u32 height = std::max(mip0_height >> t2b.srcMipLevel, 1_u32);
@@ -1907,6 +1965,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           wgpu::ImageCopyBuffer dst {
             .layout = {
               .offset = t2b.dstOffset,
+              .bytesPerRow = width * bytes_per_texel,
             },
             .buffer = *buffers.hot(t2b.dst),
           };
@@ -1919,7 +1978,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
           wgpu_enc.CopyTextureToBuffer(&src, &dst, &copy_size);
         } break;
-        case CommandCtrl::CopyBufferClear: {
+        case CommandCtrl::CopyCmdBufferClear: {
           CopyClearBufferCmd clear = decoder.copyClear(ctrl);
 
           wgpu_enc.ClearBuffer(*buffers.hot(clear.buffer), clear.offset,

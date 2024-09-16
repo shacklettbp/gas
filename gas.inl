@@ -367,7 +367,7 @@ void CopyPassEncoder::copyBufferToBuffer(Buffer src, Buffer dst,
 {
   using enum CommandCtrl;
 
-  ctrl_ |= CopyBufferToBuffer;
+  ctrl_ |= CopyCmdBufferToBuffer;
 
   u32 *ctrl_out = writer_.reserve(gpu_);
 
@@ -412,7 +412,7 @@ void CopyPassEncoder::copyBufferToTexture(Buffer src,
 {
   using enum CommandCtrl;
 
-  ctrl_ |= CopyBufferToTexture;
+  ctrl_ |= CopyCmdBufferToTexture;
 
   u32 *ctrl_out = writer_.reserve(gpu_);
 
@@ -451,7 +451,7 @@ void CopyPassEncoder::copyTextureToBuffer(Texture src,
 {
   using enum CommandCtrl;
 
-  ctrl_ |= CopyBufferToTexture;
+  ctrl_ |= CopyCmdTextureToBuffer;
 
   u32 *ctrl_out = writer_.reserve(gpu_);
 
@@ -487,7 +487,7 @@ void CopyPassEncoder::clearBuffer(Buffer buffer, u32 offset, u32 num_bytes)
 {
   using enum CommandCtrl;
 
-  ctrl_ |= CopyBufferClear;
+  ctrl_ |= CopyCmdBufferClear;
 
   u32 *ctrl_out = writer_.reserve(gpu_);
 
@@ -567,7 +567,7 @@ CopyPassEncoder CommandEncoder::beginCopyPass()
 void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
 {
   cmd_writer_ = copy_enc.writer_;
-  cmd_writer_.ctrl(gpu_, CommandCtrl::CopyPass);
+  cmd_writer_.ctrl(gpu_, CommandCtrl::None);
 }
 
 Buffer GPURuntime::createBuffer(BufferInit init,

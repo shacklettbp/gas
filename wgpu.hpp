@@ -234,8 +234,11 @@ public:
       i32 num_buffers, Buffer *buffer_hdls, void **mapped_out) final;
   void flushStagingBuffers(i32 num_buffers, Buffer *buffers) final;
 
-  Buffer createReadbackBuffer(u32 num_bytes, void **mapped_out) final;
-  void destroyReadbackBuffer(Buffer readback, void *mapped) final;
+  Buffer createReadbackBuffer(u32 num_bytes) final;
+  void destroyReadbackBuffer(Buffer readback) final;
+
+  void * beginReadback(Buffer buffer) final;
+  void endReadback(Buffer buffer) final;
    
   Buffer createStandaloneBuffer(
       BufferInit init, bool external_export = false) final;

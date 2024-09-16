@@ -62,17 +62,19 @@ TEST(GPUTmpInput, SmallTmpData)
   });
   shaderc_alloc.release();
 
+  u16 res = 64;
+
   Texture attachment0 = gpu->createTexture({
     .format = TextureFormat::RGBA8_SRGB,
-    .width = 16,
-    .height = 16,
+    .width = res,
+    .height = res,
     .usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc,
   });
 
   Texture attachment1 = gpu->createTexture({
     .format = TextureFormat::RGBA8_SRGB,
-    .width = 16,
-    .height = 16,
+    .width = res,
+    .height = res,
     .usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc,
   });
 
@@ -86,10 +88,11 @@ TEST(GPUTmpInput, SmallTmpData)
     .colorAttachments = { attachment1 },
   });
 
+  Buffer readback = gpu->createReadbackBuffer(2 * (u32)res * (u32)res * 4);
+
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   for (i32 i = 0; i < 16; i++) {
     gpu_api->processGraphicsEvents();
-    gpu->waitUntilReady(main_queue);
 
     enc.beginEncoding();
 
@@ -109,10 +112,51 @@ TEST(GPUTmpInput, SmallTmpData)
       enc.endRasterPass(raster_enc);
     }
 
+    {
+      CopyPassEncoder copy_enc = enc.beginCopyPass();
+
+      copy_enc.copyTextureToBuffer(
+          attachment0, readback, 0, 0);
+
+      copy_enc.copyTextureToBuffer(
+          attachment1, readback, 0, (u32)res * (u32)res * 4);
+
+      enc.endCopyPass(copy_enc);
+    }
+
     enc.endEncoding();
+
+    gpu->submit(main_queue, enc);
+    gpu->waitUntilReady(main_queue);
+
+    {
+      uint8_t *readback_ptr1 = (uint8_t *)gpu->beginReadback(readback);
+      uint8_t *readback_ptr2 = readback_ptr1 + (u32)res * (u32)res * 4;
+
+      for (i32 y = 0; y < res; y++) {
+        for (i32 x = 0; x < res; x++) {
+          EXPECT_EQ(readback_ptr1[0], 255);
+          EXPECT_EQ(readback_ptr1[1], 255);
+          EXPECT_EQ(readback_ptr1[2], 0);
+          EXPECT_EQ(readback_ptr1[3], 255);
+
+          EXPECT_EQ(readback_ptr2[0], 255);
+          EXPECT_EQ(readback_ptr2[1], 0);
+          EXPECT_EQ(readback_ptr2[2], 255);
+          EXPECT_EQ(readback_ptr2[3], 255);
+
+          readback_ptr1 += 4;
+          readback_ptr2 += 4;
+        }
+      }
+
+      gpu->endReadback(readback);
+    }
   }
 
   gpu->destroyCommandEncoder(enc);
+
+  gpu->destroyReadbackBuffer(readback);
 
   gpu_api->processGraphicsEvents();
   gpu->waitUntilReady(main_queue);

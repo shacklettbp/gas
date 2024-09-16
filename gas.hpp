@@ -423,62 +423,62 @@ struct SwapchainProperties {
 constexpr inline u32 TABLE_FULL = 0xFFFF'FFFF;
 
 enum class CommandCtrl : u32 {
-  None                = 0,
-  RasterPass          = 1 << 0,
-  ComputePass         = 1 << 1,
-  CopyPass            = 1 << 2,
+  None                   = 0,
+  RasterPass             = 1 << 0,
+  ComputePass            = 1 << 1,
+  CopyPass               = 1 << 2,
 
-  Draw                = 1 << 0,
-  DrawIndexed         = 1 << 1,
-  DrawShader          = 1 << 2,
-  DrawParamBlock0     = 1 << 3,
-  DrawParamBlock1     = 1 << 4,
-  DrawParamBlock2     = 1 << 5,
-  DrawDataBuffer      = 1 << 6,
-  DrawDataOffset      = 1 << 7,
-  DrawVertexBuffer0   = 1 << 8,
-  DrawVertexBuffer1   = 1 << 9,
-  DrawIndexBuffer32   = 1 << 10,
-  DrawIndexBuffer16   = 1 << 11,
-  DrawIndexOffset     = 1 << 12,
-  DrawNumTriangles    = 1 << 13,
-  DrawVertexOffset    = 1 << 14,
-  DrawInstanceOffset  = 1 << 15,
-  DrawNumInstances    = 1 << 16,
+  Draw                   = 1 << 0,
+  DrawIndexed            = 1 << 1,
+  DrawShader             = 1 << 2,
+  DrawParamBlock0        = 1 << 3,
+  DrawParamBlock1        = 1 << 4,
+  DrawParamBlock2        = 1 << 5,
+  DrawDataBuffer         = 1 << 6,
+  DrawDataOffset         = 1 << 7,
+  DrawVertexBuffer0      = 1 << 8,
+  DrawVertexBuffer1      = 1 << 9,
+  DrawIndexBuffer32      = 1 << 10,
+  DrawIndexBuffer16      = 1 << 11,
+  DrawIndexOffset        = 1 << 12,
+  DrawNumTriangles       = 1 << 13,
+  DrawVertexOffset       = 1 << 14,
+  DrawInstanceOffset     = 1 << 15,
+  DrawNumInstances       = 1 << 16,
 
-  Dispatch            = 1 << 0,
-  ComputeShader       = 1 << 1,
-  ComputeParamBlock0  = 1 << 2,
-  ComputeParamBlock1  = 1 << 3,
-  ComputeParamBlock2  = 1 << 4,
-  ComputeNumBlocksX   = 1 << 5,
-  ComputeNumBlocksY   = 1 << 6,
-  ComputeNumBlocksZ   = 1 << 7,
+  Dispatch               = 1 << 0,
+  ComputeShader          = 1 << 1,
+  ComputeParamBlock0     = 1 << 2,
+  ComputeParamBlock1     = 1 << 3,
+  ComputeParamBlock2     = 1 << 4,
+  ComputeNumBlocksX      = 1 << 5,
+  ComputeNumBlocksY      = 1 << 6,
+  ComputeNumBlocksZ      = 1 << 7,
 
-  CopyBufferToBuffer  = 1 << 0,
-  CopyBufferToTexture = 1 << 1,
-  CopyTextureToBuffer = 1 << 2,
-  CopyBufferClear     = 1 << 3,
+  CopyCmdBufferToBuffer  = 1 << 0,
+  CopyCmdBufferToTexture = 1 << 1,
+  CopyCmdTextureToBuffer = 1 << 2,
+  CopyCmdBufferClear     = 1 << 3,
 
-  CopyB2BSrcBuffer    = 1 << 4,
-  CopyB2BDstBuffer    = 1 << 5,
-  CopyB2BSrcOffset    = 1 << 6,
-  CopyB2BDstOffset    = 1 << 7,
-  CopyB2BNumBytes     = 1 << 8,
+  CopyB2BSrcBuffer       = 1 << 4,
+  CopyB2BDstBuffer       = 1 << 5,
+  CopyB2BSrcOffset       = 1 << 6,
+  CopyB2BDstOffset       = 1 << 7,
+  CopyB2BNumBytes        = 1 << 8,
 
-  CopyB2TSrcBuffer    = 1 << 4,
-  CopyB2TDstTexture   = 1 << 5,
-  CopyB2TSrcOffset    = 1 << 6,
-  CopyB2TDstMipLevel  = 1 << 7,
+  CopyB2TSrcBuffer       = 1 << 4,
+  CopyB2TDstTexture      = 1 << 5,
+  CopyB2TSrcOffset       = 1 << 6,
+  CopyB2TDstMipLevel     = 1 << 7,
 
-  CopyT2BSrcTexture   = 1 << 4,
-  CopyT2BDstBuffer    = 1 << 5,
-  CopyT2BSrcMipLevel  = 1 << 6,
-  CopyT2BDstOffset    = 1 << 7,
+  CopyT2BSrcTexture      = 1 << 4,
+  CopyT2BDstBuffer       = 1 << 5,
+  CopyT2BSrcMipLevel     = 1 << 6,
+  CopyT2BDstOffset       = 1 << 7,
 
-  CopyClearBuffer     = 1 << 4,
-  CopyClearOffset     = 1 << 5,
-  CopyClearNumBytes   = 1 << 6,
+  CopyClearBuffer        = 1 << 4,
+  CopyClearOffset        = 1 << 5,
+  CopyClearNumBytes      = 1 << 6,
 };
 inline CommandCtrl & operator|=(CommandCtrl &a, CommandCtrl b);
 inline CommandCtrl operator|(CommandCtrl a, CommandCtrl b);
@@ -706,8 +706,11 @@ public:
       i32 num_buffers, Buffer *buffers, void **mapped_out) = 0;
   virtual void flushStagingBuffers(i32 num_buffers, Buffer *buffers) = 0;
 
-  virtual Buffer createReadbackBuffer(u32 num_bytes, void **mapped_out) = 0;
-  virtual void destroyReadbackBuffer(Buffer readback, void *mapped) = 0;
+  virtual Buffer createReadbackBuffer(u32 num_bytes) = 0;
+  virtual void destroyReadbackBuffer(Buffer buffer) = 0;
+
+  virtual void * beginReadback(Buffer buffer) = 0;
+  virtual void endReadback(Buffer buffer) = 0;
    
   virtual Buffer createStandaloneBuffer(
       BufferInit init, bool external_export = false) = 0;
