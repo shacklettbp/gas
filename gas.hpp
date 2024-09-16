@@ -25,6 +25,8 @@ struct APIConfig {
 // Constants
 constexpr inline i32 MAX_COLOR_ATTACHMENTS = 8;
 constexpr inline i32 MAX_BIND_GROUPS_PER_SHADER = 4;
+constexpr inline i32 MAX_VERTEX_BUFFERS_PER_SHADER = 2;
+constexpr inline i32 MAX_VERTEX_ATTRIBUTES = 8;
 constexpr inline i32 MAX_BINDINGS_PER_GROUP = 128;
 
 // Resource Handles
@@ -261,7 +263,7 @@ struct BufferBindingConfig {
 };
 
 struct TextureBindingConfig {
-  TextureBindingType type;
+  TextureBindingType type = TextureBindingType::Texture2D;
   i32 bindLocation = -1;
   ShaderStage shaderUsage =
     ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute;
@@ -358,6 +360,23 @@ struct ShaderByteCode {
   int64_t numBytes;
 };
 
+enum class VertexFormat : u16 {
+  Scalar_F32,
+  Vec2_F32,
+  Vec3_F32,
+  Vec4_UNorm8,
+};
+
+struct VertexAttributeConfig {
+  u16 offset;
+  VertexFormat format;
+};
+
+struct VertexBufferConfig {
+  u32 stride;
+  Span<const VertexAttributeConfig> attributes;
+};
+
 enum class DepthCompare : u16 {
   GreaterOrEqual,
   Disabled,
@@ -369,10 +388,41 @@ enum class CullMode : u16 {
   BackFace,
 };
 
+enum class BlendOperation : u16 {
+  None,
+  Add,
+  Subtract,
+};
+
+enum class BlendFactor : u16 {
+  Zero,
+  One,
+  Src,
+  OneMinusSrc,
+  SrcAlpha,
+  OneMinusSrcAlpha,
+  Dst,
+  OneMinusDst,
+  DstAlpha,
+  OneMinusDstAlpha,
+};
+
+struct BlendingConfig {
+  BlendOperation colorOp = BlendOperation::None;
+  BlendFactor srcColorFactor = BlendFactor::One;
+  BlendFactor dstColorFactor = BlendFactor::Zero;
+  BlendOperation alphaOp = BlendOperation::None;
+  BlendFactor srcAlphaFactor = BlendFactor::One;
+  BlendFactor dstAlphaFactor = BlendFactor::Zero;
+  
+  static inline BlendingConfig additiveDefault();
+};
+
 struct RasterHWConfig {
   DepthCompare depthCompare = DepthCompare::GreaterOrEqual;
   bool writeDepth = true;
   CullMode cullMode = CullMode::BackFace;
+  Span<const BlendingConfig> blending = {};
 };
 
 struct RasterShaderInit {
@@ -381,6 +431,7 @@ struct RasterShaderInit {
   const char *fragmentEntry;
   RasterPassInterfaceID rasterPass;
   Span<const ParamBlockTypeID> paramBlockTypes = {};
+  Span<const VertexBufferConfig> vertexBuffers = {};
   uint32_t numPerDrawBytes = 0;
   RasterHWConfig rasterConfig = {};
 };
@@ -809,6 +860,8 @@ public:
   virtual AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain)
       = 0;
   virtual void presentSwapchainImage(Swapchain swapchain) = 0;
+
+  virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
 
   ErrorStatus currentErrorStatus();
 

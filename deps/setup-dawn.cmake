@@ -2,14 +2,11 @@ set(DAWN_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dawn-src")
 set(DAWN_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-dawn")
 set(DAWN_BUILD_TYPE "Release")
 
-set(BUNDLE_TMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundle-tmp")
-set(DAWN_BUILD_DIR "${BUNDLE_TMP_DIR}/dawn-build")
-set(DAWN_BUILD_TIMESTAMP_FILE "${BUNDLE_TMP_DIR}/dawn-build-stamp")
-set(DAWN_BUILD_CONFIG_HASH_FILE "${BUNDLE_TMP_DIR}/dawn-build-config-hash")
+set(DAWN_BUILD_DIR "${GAS_BUNDLE_TMP_DIR}/dawn-build")
+set(DAWN_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-stamp")
+set(DAWN_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-config-hash")
 
 function(fetch_build_dawn)
-  set(FETCHCONTENT_BASE_DIR "${BUNDLE_TMP_DIR}")
-  set(FETCHCONTENT_QUIET FALSE)
   FetchContent_Populate(dawn-bundled
     GIT_REPOSITORY https://dawn.googlesource.com/dawn
     GIT_TAG 40cf7fd7bc06f871fc5e482338dffa3a8ba3acfb
@@ -18,7 +15,6 @@ function(fetch_build_dawn)
     GIT_SUBMODULES_RECURSE OFF
     SOURCE_DIR "${DAWN_SRC_DIR}"
   )
-  set(FETCHCONTENT_QUIET TRUE)
 
   if (NOT WIN32) #FIX
     FetchContent_GetProperties(MadronaBundledToolchain)
@@ -103,7 +99,7 @@ endif()
       WORKING_DIRECTORY "${DAWN_SRC_DIR}"
     )
 
-file(CONFIGURE OUTPUT "${BUNDLE_TMP_DIR}/dawn-patch" NEWLINE_STYLE UNIX @ONLY CONTENT
+file(CONFIGURE OUTPUT "${GAS_BUNDLE_TMP_DIR}/dawn-patch" NEWLINE_STYLE UNIX @ONLY CONTENT
 [=[diff --git a/src/tint/CMakeLists.txt b/src/tint/CMakeLists.txt
 index 61f4f4d2d4..43b18c1eef 100644
 --- a/src/tint/CMakeLists.txt
@@ -125,7 +121,7 @@ index 61f4f4d2d4..43b18c1eef 100644
     )
 
     execute_process(COMMAND
-      ${GIT_EXECUTABLE} apply "${BUNDLE_TMP_DIR}/dawn-patch"
+      ${GIT_EXECUTABLE} apply "${GAS_BUNDLE_TMP_DIR}/dawn-patch"
       WORKING_DIRECTORY "${DAWN_SRC_DIR}"
       COMMAND_ERROR_IS_FATAL ANY
     )

@@ -27,16 +27,16 @@ struct InitDeviceResult {
 
 inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
 {
-  using Out = wgpu::TextureFormat;
+  using O = wgpu::TextureFormat;
   using enum TextureFormat;
 
   switch (in) {
-    case None: return Out::Undefined;
-    case RGBA8_UNorm: return Out::RGBA8Unorm;
-    case RGBA8_SRGB: return Out::RGBA8UnormSrgb;
-    case BGRA8_UNorm: return Out::BGRA8Unorm;
-    case BGRA8_SRGB: return Out::BGRA8UnormSrgb;
-    case Depth32_Float: return Out::Depth32Float;
+    case None: return O::Undefined;
+    case RGBA8_UNorm: return O::RGBA8Unorm;
+    case RGBA8_SRGB: return O::RGBA8UnormSrgb;
+    case BGRA8_UNorm: return O::BGRA8Unorm;
+    case BGRA8_SRGB: return O::BGRA8UnormSrgb;
+    case Depth32_Float: return O::Depth32Float;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -57,61 +57,61 @@ inline TextureFormat convertWebGPUTextureFormat(wgpu::TextureFormat in)
 
 inline wgpu::TextureUsage convertTextureUsage(TextureUsage in)
 {
-  using Out = wgpu::TextureUsage;
+  using O = wgpu::TextureUsage;
   using enum TextureUsage;
 
-  u64 out = (u64)Out::None;
-  static_assert(sizeof(u64) == sizeof(Out));
+  u64 out = (u64)O::None;
+  static_assert(sizeof(u64) == sizeof(O));
 
   if ((in & CopySrc) == CopySrc) {
-    out |= (u64)Out::CopySrc;
+    out |= (u64)O::CopySrc;
   }
 
   if ((in & CopyDst) == CopyDst) {
-    out |= (u64)Out::CopyDst;
+    out |= (u64)O::CopyDst;
   }
 
   if ((in & ShaderSampled) == ShaderSampled) {
-    out |= (u64)Out::TextureBinding;
+    out |= (u64)O::TextureBinding;
   }
 
   if ((in & ShaderStorage) == ShaderSampled) {
-    out |= (u64)Out::StorageBinding;
+    out |= (u64)O::StorageBinding;
   }
 
   if ((in & ColorAttachment) == ColorAttachment) {
-    out |= (u64)Out::RenderAttachment;
+    out |= (u64)O::RenderAttachment;
   }
 
   if ((in & DepthAttachment) == DepthAttachment) {
-    out |= (u64)Out::RenderAttachment;
+    out |= (u64)O::RenderAttachment;
   }
 
-  return (Out)out;
+  return (O)out;
 }
 
 inline wgpu::AddressMode convertSamplerAddressMode(SamplerAddressMode in)
 {
-  using Out = wgpu::AddressMode;
+  using O = wgpu::AddressMode;
   using enum SamplerAddressMode;
 
   switch (in) {
-    case Clamp: return Out::ClampToEdge;
-    case Repeat: return Out::Repeat;
-    case MirrorRepeat: return Out::MirrorRepeat;
-    case InheritUMode: return Out::Undefined;
+    case Clamp: return O::ClampToEdge;
+    case Repeat: return O::Repeat;
+    case MirrorRepeat: return O::MirrorRepeat;
+    case InheritUMode: return O::Undefined;
     default: MADRONA_UNREACHABLE();
   }
 }
 
 inline wgpu::FilterMode convertSamplerFilterMode(SamplerFilterMode in)
 {
-  using Out = wgpu::FilterMode;
+  using O = wgpu::FilterMode;
   using enum SamplerFilterMode;
 
   switch (in) {
-    case Nearest: return Out::Nearest;
-    case Linear: return Out::Linear;
+    case Nearest: return O::Nearest;
+    case Linear: return O::Linear;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -119,85 +119,85 @@ inline wgpu::FilterMode convertSamplerFilterMode(SamplerFilterMode in)
 inline wgpu::MipmapFilterMode
     convertSamplerFilterModeToMipFilterMode(SamplerFilterMode in)
 {
-  using Out = wgpu::MipmapFilterMode;
+  using O = wgpu::MipmapFilterMode;
   using enum SamplerFilterMode;
 
   switch (in) {
-    case Nearest: return Out::Nearest;
-    case Linear: return Out::Linear;
+    case Nearest: return O::Nearest;
+    case Linear: return O::Linear;
     default: MADRONA_UNREACHABLE();
   }
 }
 
 inline wgpu::BufferUsage convertBufferUsage(BufferUsage in)
 {
-  using Out = wgpu::BufferUsage;
+  using O = wgpu::BufferUsage;
   using enum BufferUsage;
 
-  u64 out = (u64)Out::None;
-  static_assert(sizeof(u64) == sizeof(Out));
+  u64 out = (u64)O::None;
+  static_assert(sizeof(u64) == sizeof(O));
 
   if ((in & CopySrc) == CopySrc) {
-    out |= (u64)Out::CopySrc;
+    out |= (u64)O::CopySrc;
   }
 
   if ((in & CopyDst) == CopyDst) {
-    out |= (u64)Out::CopyDst;
+    out |= (u64)O::CopyDst;
   }
 
   if ((in & DrawIndex) == DrawIndex) {
-    out |= (u64)Out::Index;
+    out |= (u64)O::Index;
   }
 
   if ((in & DrawVertex) == DrawVertex) {
-    out |= (u64)Out::Vertex;
+    out |= (u64)O::Vertex;
   }
 
   if ((in & ShaderUniform) == ShaderUniform) {
-    out |= (u64)Out::Uniform;
+    out |= (u64)O::Uniform;
   }
 
   if ((in & ShaderStorage) == ShaderStorage) {
-    out |= (u64)Out::Storage;
+    out |= (u64)O::Storage;
   }
 
-  return (Out)out;
+  return (O)out;
 }
 
 inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
 {
-  using Out = wgpu::CompareFunction;
+  using O = wgpu::CompareFunction;
   using enum DepthCompare;
 
   switch (in) {
-    case GreaterOrEqual: return Out::GreaterEqual;
-    case Disabled: return Out::Never;
+    case GreaterOrEqual: return O::GreaterEqual;
+    case Disabled: return O::Never;
     default: MADRONA_UNREACHABLE();
   }
 };
 
 inline wgpu::CullMode convertCullMode(CullMode in)
 {
-  using Out = wgpu::CullMode;
+  using O = wgpu::CullMode;
   using enum CullMode;
 
   switch (in) {
-    case None: return Out::None;
-    case FrontFace: return Out::Front;
-    case BackFace: return Out::Back;
+    case None: return O::None;
+    case FrontFace: return O::Front;
+    case BackFace: return O::Back;
     default: MADRONA_UNREACHABLE();
   }
 }
 
 inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
 {
-  using Out = wgpu::LoadOp;
+  using O = wgpu::LoadOp;
   using enum AttachmentLoadMode;
 
   switch (in) {
-    case Load: return Out::Load;
-    case Clear: return Out::Clear;
-    case Undefined: return Out::Undefined;
+    case Load: return O::Load;
+    case Clear: return O::Clear;
+    case Undefined: return O::Undefined;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -205,49 +205,94 @@ inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
 inline wgpu::StoreOp convertAttachmentStoreMode(
     AttachmentStoreMode in)
 {
-  using Out = wgpu::StoreOp;
+  using O = wgpu::StoreOp;
   using enum AttachmentStoreMode;
 
   switch (in) {
-    case Store: return Out::Store;
-    case Undefined: return Out::Undefined;
+    case Store: return O::Store;
+    case Undefined: return O::Undefined;
     default: MADRONA_UNREACHABLE();
   }
 }
 
 inline wgpu::ShaderStage convertShaderStage(ShaderStage in)
 {
-  using Out = wgpu::ShaderStage;
+  using O = wgpu::ShaderStage;
   using enum ShaderStage;
 
-  u64 out = (u64)Out::None;
-  static_assert(sizeof(u64) == sizeof(Out));
+  u64 out = (u64)O::None;
+  static_assert(sizeof(u64) == sizeof(O));
 
   if ((in & Vertex) == Vertex) {
-    out |= (u64)Out::Vertex;
+    out |= (u64)O::Vertex;
   }
 
   if ((in & Fragment) == Fragment) {
-    out |= (u64)Out::Fragment;
+    out |= (u64)O::Fragment;
   }
 
   if ((in & Compute) == Compute) {
-    out |= (u64)Out::Compute;
+    out |= (u64)O::Compute;
   }
 
-  return (Out)out;
+  return (O)out;
 }
 
-inline wgpu::BufferBindingType convertBufferBindingType(
-  BufferBindingType in)
+inline wgpu::BufferBindingType convertBufferBindingType(BufferBindingType in)
 {
-  using Out = wgpu::BufferBindingType;
+  using O = wgpu::BufferBindingType;
   using enum BufferBindingType;
 
   switch (in) {
-    case Uniform: case DynamicUniform: return Out::Uniform;
-    case Storage: return Out::ReadOnlyStorage;
-    case StorageRW: return Out::Storage;
+    case Uniform: case DynamicUniform: return O::Uniform;
+    case Storage: return O::ReadOnlyStorage;
+    case StorageRW: return O::Storage;
+    default: MADRONA_UNREACHABLE();
+  }
+}
+
+inline wgpu::VertexFormat convertVertexFormat(VertexFormat in)
+{
+  using O = wgpu::VertexFormat;
+  using enum VertexFormat;
+  switch (in) {
+    case Scalar_F32: return O::Float32;
+    case Vec2_F32: return O::Float32x2;
+    case Vec3_F32: return O::Float32x3;
+    case Vec4_UNorm8: return O::Unorm8x4;
+    default: MADRONA_UNREACHABLE();
+  }
+}
+
+inline wgpu::BlendOperation convertBlendOp(BlendOperation in)
+{
+  using O = wgpu::BlendOperation;
+  using enum BlendOperation;
+
+  switch (in) {
+    case None: return O::Undefined;
+    case Add: return O::Add;
+    case Subtract: return O::Subtract;
+    default: MADRONA_UNREACHABLE();
+  }
+}
+
+inline wgpu::BlendFactor convertBlendFactor(BlendFactor in)
+{
+  using O = wgpu::BlendFactor;
+  using enum BlendFactor;
+
+  switch (in) {
+    case Zero: return O::Zero;
+    case One: return O::One;
+    case Src: return O::Src;
+    case OneMinusSrc: return O::OneMinusSrc;
+    case SrcAlpha: return O::SrcAlpha;
+    case OneMinusSrcAlpha: return O::OneMinusSrcAlpha;
+    case Dst: return O::Dst;
+    case OneMinusDst: return O::OneMinusDst;
+    case DstAlpha: return O::DstAlpha;
+    case OneMinusDstAlpha: return O::OneMinusDstAlpha;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -1368,17 +1413,35 @@ void Backend::createRasterShaders(i32 num_shaders,
     const BackendRasterPassConfig *pass_cfg = 
         getRasterPassConfigByID(shader_init.rasterPass);
 
-    wgpu::DepthStencilState depth_state {
-      .format = pass_cfg->depthAttachment.format,
-      .depthWriteEnabled = raster_cfg.writeDepth,
-      .depthCompare = convertDepthCompare(raster_cfg.depthCompare),
-    };
+    std::array<
+        std::array<wgpu::VertexAttribute,
+                   MAX_VERTEX_ATTRIBUTES>,
+        MAX_VERTEX_BUFFERS_PER_SHADER> vertex_attributes;
 
-    wgpu::ColorTargetState color_tgt_states[MAX_COLOR_ATTACHMENTS];
-    for (i32 i = 0; i < pass_cfg->numColorAttachments; i++) {
-      color_tgt_states[i] = {
-        .format = pass_cfg->colorAttachments[i].format,
-      };
+    std::array<wgpu::VertexBufferLayout, MAX_VERTEX_BUFFERS_PER_SHADER>
+        vertex_buffers;
+
+    const i32 num_vertex_buffers = (i32)shader_init.vertexBuffers.size();
+    assert(num_vertex_buffers < MAX_VERTEX_BUFFERS_PER_SHADER);
+    for (i32 vbuf_idx = 0; vbuf_idx < num_vertex_buffers; vbuf_idx++) {
+      const VertexBufferConfig &vbuf_cfg = shader_init.vertexBuffers[vbuf_idx];
+      wgpu::VertexBufferLayout &out_layout = vertex_buffers[vbuf_idx];
+      out_layout.arrayStride = vbuf_cfg.stride;
+      
+      wgpu::VertexAttribute *out_attrs = vertex_attributes[vbuf_idx].data();
+      const i32 num_attrs = vbuf_cfg.attributes.size();
+      assert(num_attrs < MAX_VERTEX_ATTRIBUTES);
+      for (i32 i = 0; i < num_attrs; i++) {
+        VertexAttributeConfig attr_cfg = vbuf_cfg.attributes[i];
+        out_attrs[i] = {
+          .format = convertVertexFormat(attr_cfg.format),
+          .offset = attr_cfg.offset,
+          .shaderLocation = (u32)i,
+        };
+      }
+
+      out_layout.attributeCount = (size_t)num_attrs;
+      out_layout.attributes = out_attrs;
     }
 
     wgpu::VertexState vert_state {
@@ -1386,9 +1449,44 @@ void Backend::createRasterShaders(i32 num_shaders,
       .entryPoint = shader_init.vertexEntry,
       .constantCount = 0,
       .constants = nullptr,
-      .bufferCount = 0,
-      .buffers = nullptr,
+      .bufferCount = (size_t)num_vertex_buffers,
+      .buffers = vertex_buffers.data(),
     };
+
+    wgpu::DepthStencilState depth_state {
+      .format = pass_cfg->depthAttachment.format,
+      .depthWriteEnabled = raster_cfg.writeDepth,
+      .depthCompare = convertDepthCompare(raster_cfg.depthCompare),
+    };
+
+    wgpu::ColorTargetState color_tgt_states[MAX_COLOR_ATTACHMENTS];
+    
+    for (i32 i = 0; i < pass_cfg->numColorAttachments; i++) {
+      const BackendColorAttachmentConfig &attach_cfg  =
+          pass_cfg->colorAttachments[i];
+      color_tgt_states[i] = {
+        .format = attach_cfg.format,
+      };
+    }
+
+    assert(raster_cfg.blending.size() == 0 ||
+      raster_cfg.blending.size() == pass_cfg->numColorAttachments);
+
+    for (i32 i = 0; i < raster_cfg.blending.size(); i++) {
+      BlendingConfig blend_cfg = raster_cfg.blending[i];
+      wgpu::BlendState blend_out;
+      blend_out.color.operation = convertBlendOp(blend_cfg.colorOp);
+      blend_out.color.srcFactor = convertBlendFactor(blend_cfg.srcColorFactor);
+      blend_out.color.dstFactor = convertBlendFactor(blend_cfg.dstColorFactor);
+      blend_out.alpha.operation = convertBlendOp(blend_cfg.alphaOp);
+      blend_out.alpha.srcFactor = convertBlendFactor(blend_cfg.srcAlphaFactor);
+      blend_out.alpha.dstFactor = convertBlendFactor(blend_cfg.dstAlphaFactor);
+
+      if (blend_out.color.operation != wgpu::BlendOperation::Undefined &&
+          blend_out.alpha.operation != wgpu::BlendOperation::Undefined) {
+        color_tgt_states[i].blend = &blend_out;
+      }
+    }
 
     wgpu::FragmentState frag_state {
       .module = shader_mod,
@@ -1607,6 +1705,11 @@ void Backend::waitUntilIdle()
     FATAL("WebGPU backend waitUntilIdle: work done callback failure: %lu",
          (u64)queue_status);
   }
+}
+
+ShaderByteCodeType Backend::backendShaderByteCodeType()
+{
+  return ShaderByteCodeType::WGSL;
 }
 
 // GPUTmpInputState::MAX_BUFFERS frontend buffer handles are reserved starting 

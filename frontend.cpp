@@ -1,4 +1,5 @@
-#include "gui.hpp"
+#include "gas_ui.hpp"
+#include "gas_imgui.hpp"
 #include "shader_compiler.hpp"
 
 namespace gas {
@@ -33,12 +34,11 @@ int main(int argc, char *argv[])
 
   StackAlloc shaderc_alloc;
   ShaderByteCode shader_bytecode;
+  ShaderCompiler *shaderc = shaderc_lib.createCompiler();
   {
-    ShaderCompiler *shaderc = shaderc_lib.createCompiler();
-
     ShaderCompileResult compile_result =
       shaderc->compileShader(shaderc_alloc, {
-        .path = GAS_SRC_DIR "basic.slang",
+        .path = GAS_SHADER_DIR "basic.slang",
       });
 
     if (compile_result.diagnostics.size() != 0) {
@@ -51,8 +51,6 @@ int main(int argc, char *argv[])
 
     shader_bytecode =
         compile_result.getByteCodeForBackend(backend_bytecode_type);
-
-    shaderc_lib.destroyCompiler(shaderc);
   }
 
   GPURuntime *gpu = gpu_api->createRuntime(0, {window->surface});
@@ -60,6 +58,10 @@ int main(int argc, char *argv[])
   SwapchainProperties swapchain_properties;
   Swapchain swapchain = gpu->createSwapchain(
       window->surface, &swapchain_properties);
+
+  ImGuiSystem::init(wm, gpu, shaderc, swapchain_properties.format);
+
+  shaderc_lib.destroyCompiler(shaderc);
 
   Buffer uniform_buf;
   {
@@ -172,6 +174,8 @@ int main(int argc, char *argv[])
   gpu->destroyBuffer(uniform_buf);
 
   gpu->destroyRasterShader(shader);
+
+  ImGuiSystem::shutdown(gpu);
 
   gpu->destroySwapchain(swapchain);
 

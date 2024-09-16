@@ -75,6 +75,21 @@ Texture Swapchain::proxyAttachment() const
   return Texture { .gen = 0, .id = (u16)id };
 }
 
+inline BlendingConfig BlendingConfig::additiveDefault()
+{
+  using enum BlendOperation;
+  using enum BlendFactor;
+
+  return BlendingConfig {
+    .colorOp = Add,
+    .srcColorFactor = SrcAlpha,
+    .dstColorFactor = OneMinusSrcAlpha,
+    .alphaOp = Add,
+    .srcAlphaFactor = One,
+    .dstAlphaFactor = OneMinusSrcAlpha,
+  };
+}
+
 u32 * CommandWriter::reserve(GPURuntime *gpu)
 {
   if ((size_t)offset_ == cmds_->data.size()) [[unlikely]] {

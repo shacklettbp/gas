@@ -1,20 +1,16 @@
 set(SLANG_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-slang")
 
-set(BUNDLE_TMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundle-tmp")
-set(SLANG_SRC_DIR "${BUNDLE_TMP_DIR}/slang")
-set(SLANG_BUILD_TIMESTAMP_FILE "${BUNDLE_TMP_DIR}/slang-build-stamp")
-set(SLANG_BUILD_CONFIG_HASH_FILE "${BUNDLE_TMP_DIR}/slang-build-config-hash")
+set(SLANG_SRC_DIR "${GAS_BUNDLE_TMP_DIR}/slang")
+set(SLANG_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/slang-build-stamp")
+set(SLANG_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/slang-build-config-hash")
 
 function(fetch_build_slang)
-  set(FETCHCONTENT_BASE_DIR "${BUNDLE_TMP_DIR}")
-  set(FETCHCONTENT_QUIET FALSE)
   FetchContent_Populate(slang-bundled
     GIT_REPOSITORY https://github.com/shader-slang/slang
     GIT_TAG v2024.11
     GIT_PROGRESS ON
     SOURCE_DIR "${SLANG_SRC_DIR}"
   )
-  set(FETCHCONTENT_QUIET TRUE)
 
   if (NOT WIN32) #FIX
     FetchContent_GetProperties(MadronaBundledToolchain)
@@ -85,7 +81,7 @@ index ed9e9046..d6e6728f 100644
      if (sink->getErrorCount() != 0)
 ]=])
 
-    file(CONFIGURE OUTPUT "${BUNDLE_TMP_DIR}/slang-patch" CONTENT "${PATCH_STR}" NEWLINE_STYLE UNIX)
+    file(CONFIGURE OUTPUT "${GAS_BUNDLE_TMP_DIR}/slang-patch" CONTENT "${PATCH_STR}" NEWLINE_STYLE UNIX)
 
     execute_process(COMMAND
       ${GIT_EXECUTABLE} checkout 
@@ -96,7 +92,7 @@ index ed9e9046..d6e6728f 100644
     )
 
     execute_process(COMMAND
-      ${GIT_EXECUTABLE} apply "${BUNDLE_TMP_DIR}/slang-patch"
+      ${GIT_EXECUTABLE} apply "${GAS_BUNDLE_TMP_DIR}/slang-patch"
       WORKING_DIRECTORY "${SLANG_SRC_DIR}"
       COMMAND_ERROR_IS_FATAL ANY
     )

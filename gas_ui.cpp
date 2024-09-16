@@ -1,4 +1,4 @@
-#include "gui.hpp"
+#include "gas_ui.hpp"
 #include <madrona/crash.hpp>
 #include <madrona/heap_array.hpp>
 

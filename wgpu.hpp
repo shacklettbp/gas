@@ -298,6 +298,8 @@ public:
 
   void waitUntilIdle() final;
 
+  ShaderByteCodeType backendShaderByteCodeType() final;
+
   GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
 
   inline BackendRasterPassConfig * getRasterPassConfigByID(

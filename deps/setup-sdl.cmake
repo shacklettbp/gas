@@ -2,15 +2,11 @@ set(SDL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdl-src")
 set(SDL_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-sdl")
 set(SDL_BUILD_TYPE "Release")
 
-set(BUNDLE_TMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundle-tmp")
-set(SDL_BUILD_DIR "${BUNDLE_TMP_DIR}/sdl-build")
-set(SDL_BUILD_TIMESTAMP_FILE "${BUNDLE_TMP_DIR}/sdl-build-stamp")
-set(SDL_BUILD_CONFIG_HASH_FILE "${BUNDLE_TMP_DIR}/sdl-build-config-hash")
+set(SDL_BUILD_DIR "${GAS_BUNDLE_TMP_DIR}/sdl-build")
+set(SDL_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/sdl-build-stamp")
+set(SDL_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/sdl-build-config-hash")
 
 function(fetch_build_sdl)
-
-  set(FETCHCONTENT_BASE_DIR "${BUNDLE_TMP_DIR}")
-  set(FETCHCONTENT_QUIET FALSE)
   FetchContent_Declare(sdl-bundled
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
     GIT_TAG 9ff3446f036094bc005ef119e0cf07fc9b503b8e 
@@ -19,7 +15,6 @@ function(fetch_build_sdl)
   )
 
   FetchContent_MakeAvailable(sdl-bundled)
-  set(FETCHCONTENT_QUIET TRUE)
 
   list(APPEND SDL_CMAKE_ARGS
     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"

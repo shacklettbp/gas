@@ -1,8 +1,8 @@
-#include "gui.hpp"
+#include "gas_ui.hpp"
 
 #include <gtest/gtest.h>
 
-TEST(GUI, ManySwapchains)
+TEST(UI, ManySwapchains)
 {
   using namespace gas;
   using namespace gas;

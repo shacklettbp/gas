@@ -214,3 +214,20 @@ endfunction()
 
 find_slang()
 unset(find_slang)
+
+function(find_imgui)
+  add_library(gas_imgui_hdrs INTERFACE)
+  target_include_directories(gas_imgui_hdrs SYSTEM INTERFACE
+    $<BUILD_INTERFACE:${IMGUI_BUNDLED_DIR}>
+  )
+
+  add_library(gas_imgui_impl OBJECT
+    ${IMGUI_BUNDLED_DIR}/imgui.cpp
+    ${IMGUI_BUNDLED_DIR}/imgui_draw.cpp
+    ${IMGUI_BUNDLED_DIR}/imgui_tables.cpp
+    ${IMGUI_BUNDLED_DIR}/imgui_widgets.cpp
+  )
+endfunction()
+
+find_imgui()
+unset(find_imgui)

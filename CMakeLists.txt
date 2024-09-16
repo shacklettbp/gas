@@ -48,29 +48,40 @@ add_library(gas_core STATIC
   ${GAS_CORE_SOURCES}
 )
 
-target_link_libraries(gas_core PRIVATE
-  madrona_common
+target_compile_definitions(gas_core PUBLIC 
+  GAS_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\"
 )
 
-target_include_directories(gas_core PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}
+target_link_libraries(gas_core PRIVATE
+  madrona_common
 )
 
 if (GAS_USE_DAWN)
   target_link_libraries(gas_core PRIVATE gas_dawn)
 endif()
 
-add_library(gas_gui STATIC
-  gui.hpp gui.inl gui.cpp
+add_library(gas_ui STATIC
+  gas_ui.hpp gas_ui.inl gas_ui.cpp
 )
 
-target_link_libraries(gas_gui PRIVATE
+target_link_libraries(gas_ui PRIVATE
   gas_core madrona_common
 )
 
 if (GAS_USE_SDL)
-  target_link_libraries(gas_gui PRIVATE gas_sdl)
+  target_link_libraries(gas_ui PRIVATE gas_sdl)
 endif()
+
+add_library(gas_imgui STATIC
+  gas_imgui.hpp gas_imgui.cpp
+)
+
+target_link_libraries(gas_imgui
+  PUBLIC
+    gas_imgui_hdrs
+  PRIVATE
+    gas_core gas_ui gas_imgui_impl madrona_common
+)
 
 add_library(gas_shader_compiler SHARED
   shader_compiler.hpp shader_compiler.inl shader_compiler.cpp
@@ -123,14 +134,11 @@ add_executable(gas_frontend
   frontend.cpp 
 )
 
-target_compile_definitions(gas_frontend PRIVATE
-  GAS_SRC_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\"
-)
-
 target_link_libraries(gas_frontend
   PRIVATE 
     gas_core
-    gas_gui
+    gas_ui
+    gas_imgui
     madrona_common
 )
 
