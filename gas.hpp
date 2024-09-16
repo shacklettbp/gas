@@ -106,7 +106,7 @@ struct StagingHandle {
 struct MappedTmpBuffer {
   Buffer buffer;
   u32 offset;
-  void *ptr;
+  u8 *ptr;
 };
 
 struct GPUQueue {
@@ -850,9 +850,6 @@ public:
   virtual void destroyRuntime(GPURuntime *runtime) = 0;
 
   virtual void processGraphicsEvents() = 0;
-
-  ShaderCompilerLib loadShaderCompiler();
-  void unloadShaderCompiler(ShaderCompilerLib compiler_lib);
 
   virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
 };

@@ -186,7 +186,7 @@ MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
   return MappedTmpBuffer {
     .buffer = gpu_input_.buffer,
     .offset = offset,
-    .ptr = gpu_input_.ptr,
+    .ptr = gpu_input_.ptr + offset,
   };
 }
 
@@ -361,7 +361,12 @@ RasterPassEncoder::RasterPassEncoder(GPURuntime *gpu,
     gpu_input_(gpu_input),
     ctrl_(CommandCtrl::None),
     state_()
-{}
+{
+  if (!gpu_input_.buffer.null()) {
+    state_.dataBuffer = gpu_input_.buffer;
+    ctrl_ |= CommandCtrl::DrawDataBuffer;
+  }
+}
 
 CopyCommand::CopyCommand()
   : data { 0, 0, 0, 0, 0 }
@@ -540,7 +545,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes)
   return MappedTmpBuffer {
     .buffer = gpu_input_.buffer,
     .offset = offset,
-    .ptr = gpu_input_.ptr,
+    .ptr = gpu_input_.ptr + offset,
   };
 }
 

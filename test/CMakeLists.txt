@@ -1,24 +1,35 @@
-add_executable(gas_tests
+add_executable(gas_test_utils
   gas_table.cpp
   uuid.cpp
-  gpu_tmp_input.cpp
 )
 
-target_link_libraries(gas_tests
+target_link_libraries(gas_test_utils PRIVATE
   gtest_main
   gas_core
   madrona_common
 )
 
-target_compile_definitions(gas_tests PRIVATE
+add_executable(gas_test_gpu
+  test_gpu.hpp
+  gpu_tmp_input.cpp
+  test_gpu_main.cpp
+)
+
+target_compile_definitions(gas_test_gpu PRIVATE
   GAS_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\"
 )
 
-add_executable(gas_gui_tests
+target_link_libraries(gas_test_gpu PRIVATE
+  gtest
+  gas_core
+  madrona_common
+)
+
+add_executable(gas_test_gui
   swapchain.cpp
 )
 
-target_link_libraries(gas_gui_tests
+target_link_libraries(gas_test_gui
   gtest_main
   gas_core
   gas_gui
@@ -26,5 +37,6 @@ target_link_libraries(gas_gui_tests
 )
 
 include(GoogleTest)
-gtest_discover_tests(gas_tests)
-gtest_discover_tests(gas_gui_tests)
+gtest_discover_tests(gas_test_utils)
+gtest_discover_tests(gas_test_gpu)
+gtest_discover_tests(gas_test_gui)

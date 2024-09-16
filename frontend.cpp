@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 
   Window *window = wm.createMainWindow("Labyrinth", 1920, 1080);
   
-  ShaderCompilerLib shaderc_lib = gpu_api->loadShaderCompiler();
+  ShaderCompilerLib shaderc_lib = InitSystem::loadShaderCompiler();
   auto backend_bytecode_type = gpu_api->backendShaderByteCodeType();
 
   StackAlloc shaderc_alloc;
@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 
   gpu_api->destroyRuntime(gpu);
 
-  gpu_api->unloadShaderCompiler(shaderc_lib);
+  InitSystem::unloadShaderCompiler(shaderc_lib);
 
   wm.destroyMainWindow();
   wm.shutdown();
