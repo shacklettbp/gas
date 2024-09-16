@@ -181,13 +181,7 @@ MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
     };
   }
 
-  u32 offset = gpu_input_.alloc(num_bytes);
-  if (gpu_input_.blockFull()) [[unlikely]] {
-    gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
-    offset = gpu_input_.offset;
-
-    gpu_input_.offset += num_bytes;
-  }
+  u32 offset = allocGPUTmpInput(num_bytes);
 
   return MappedTmpBuffer {
     .buffer = gpu_input_.buffer,
@@ -198,11 +192,26 @@ MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
 
 void * RasterPassEncoder::drawData(u32 num_bytes)
 {
+  u32 offset = allocGPUTmpInput(num_bytes);
+
+  ctrl_ |= CommandCtrl::DrawDataOffset;
+  state_.dataOffset = offset;
+
+  return gpu_input_.ptr + offset;
+}
+
+u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes)
+{
   u32 offset = gpu_input_.alloc(num_bytes);
   if (gpu_input_.blockFull()) [[unlikely]] {
     GPUTmpInputBlock new_block = gpu_->allocGPUTmpInputBlock(queue_);
 
-    if (gpu_input_.buffer != new_block.buffer) {
+    if (gpu_input_.buffer != new_block.buffer) [[unlikely]] {
+      // Note that tmpBuffer also calls this function, and does not
+      // normally need to set CommandCtrl dirty bits. However in this
+      // situation, tmpBuffer can trigger switching to a new buffer
+      // and later drawData calls in the same buffer need to set this
+      // bit so the backend loop updates the current buffer
       ctrl_ |= CommandCtrl::DrawDataBuffer;
       state_.dataBuffer = new_block.buffer;
 
@@ -214,10 +223,7 @@ void * RasterPassEncoder::drawData(u32 num_bytes)
     offset = new_block.offset;
   }
 
-  ctrl_ |= CommandCtrl::DrawDataOffset;
-  state_.dataOffset = offset;
-
-  return gpu_input_.ptr + offset;
+  return offset;
 }
 
 template <typename T>

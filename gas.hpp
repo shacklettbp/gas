@@ -580,6 +580,8 @@ private:
                          u32 index_offset, u32 num_triangles,
                          u32 instance_offset, u32 num_instances);
 
+  inline u32 allocGPUTmpInput(u32 num_bytes);
+
   inline RasterPassEncoder(GPURuntime *gpu,
                            CommandWriter writer,
                            GPUQueue queue_,

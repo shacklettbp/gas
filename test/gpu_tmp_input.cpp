@@ -49,7 +49,7 @@ TEST(GPUTmpInput, SmallTmpData)
   RasterPassInterface rp_iface = gpu->createRasterPassInterface({
     .uuid = "rp"_to_uuid,
     .colorAttachments = {
-      { .format = TextureFormat::RGBA8_SRGB },
+      { .format = TextureFormat::RGBA8_UNorm },
     },
   });
 
@@ -65,14 +65,14 @@ TEST(GPUTmpInput, SmallTmpData)
   u16 res = 64;
 
   Texture attachment0 = gpu->createTexture({
-    .format = TextureFormat::RGBA8_SRGB,
+    .format = TextureFormat::RGBA8_UNorm,
     .width = res,
     .height = res,
     .usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc,
   });
 
   Texture attachment1 = gpu->createTexture({
-    .format = TextureFormat::RGBA8_SRGB,
+    .format = TextureFormat::RGBA8_UNorm,
     .width = res,
     .height = res,
     .usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc,
@@ -91,23 +91,29 @@ TEST(GPUTmpInput, SmallTmpData)
   Buffer readback = gpu->createReadbackBuffer(2 * (u32)res * (u32)res * 4);
 
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
-  for (i32 i = 0; i < 16; i++) {
+  const i32 num_iters = 16; 
+  for (i32 i = 0; i < num_iters; i++) {
     gpu_api->processGraphicsEvents();
 
     enc.beginEncoding();
 
+    f32 iter_v = f32(i) / (num_iters - 1);
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp0);
+      raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+
       raster_enc.setShader(shader);
-      raster_enc.drawData(Vector3 { 1, 1, 0 });
+      raster_enc.drawData(Vector3 { 1, 1, iter_v });
       raster_enc.draw(0, 1);
       enc.endRasterPass(raster_enc);
     }
 
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
+      //raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+
       raster_enc.setShader(shader);
-      raster_enc.drawData(Vector3 { 1, 0, 1 });
+      raster_enc.drawData(Vector3 { 1, iter_v, 1 });
       raster_enc.draw(0, 1);
       enc.endRasterPass(raster_enc);
     }
@@ -137,11 +143,11 @@ TEST(GPUTmpInput, SmallTmpData)
         for (i32 x = 0; x < res; x++) {
           EXPECT_EQ(readback_ptr1[0], 255);
           EXPECT_EQ(readback_ptr1[1], 255);
-          EXPECT_EQ(readback_ptr1[2], 0);
+          EXPECT_EQ(readback_ptr1[2], u8(255 * iter_v));
           EXPECT_EQ(readback_ptr1[3], 255);
 
           EXPECT_EQ(readback_ptr2[0], 255);
-          EXPECT_EQ(readback_ptr2[1], 0);
+          EXPECT_EQ(readback_ptr2[1], u8(255 * iter_v));
           EXPECT_EQ(readback_ptr2[2], 255);
           EXPECT_EQ(readback_ptr2[3], 255);
 
