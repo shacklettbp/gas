@@ -204,23 +204,23 @@ u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes)
 {
   u32 offset = gpu_input_.alloc(num_bytes);
   if (gpu_input_.blockFull()) [[unlikely]] {
-    GPUTmpInputBlock new_block = gpu_->allocGPUTmpInputBlock(queue_);
+    gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
 
-    if (gpu_input_.buffer != new_block.buffer) [[unlikely]] {
+    if (state_.dataBuffer != gpu_input_.buffer) [[unlikely]] {
       // Note that tmpBuffer also calls this function, and does not
       // normally need to set CommandCtrl dirty bits. However in this
       // situation, tmpBuffer can trigger switching to a new buffer
       // and later drawData calls in the same buffer need to set this
-      // bit so the backend loop updates the current buffer
+      // bit so the backend loop updates the current buffer.
+      // The alternative would be to move this if statement 
+      // into drawData but then it would need to be checked on each
+      // call rather than only on fetching a new block.
       ctrl_ |= CommandCtrl::DrawDataBuffer;
-      state_.dataBuffer = new_block.buffer;
-
-      gpu_input_.ptr = new_block.ptr;
-      gpu_input_.buffer = new_block.buffer;
+      state_.dataBuffer = gpu_input_.buffer;
     }
 
-    gpu_input_.offset = new_block.offset + num_bytes;
-    offset = new_block.offset;
+    offset = gpu_input_.offset;
+    gpu_input_.offset += num_bytes;
   }
 
   return offset;
@@ -519,9 +519,37 @@ void CopyPassEncoder::clearBuffer(Buffer buffer, u32 offset, u32 num_bytes)
   ctrl_ = None;
 }
 
-CopyPassEncoder::CopyPassEncoder(GPURuntime *gpu, CommandWriter writer)
+MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes)
+{
+  if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) [[unlikely]] {
+    return MappedTmpBuffer {
+      .buffer = {},
+      .offset = 0,
+      .ptr = nullptr,
+    };
+  }
+
+  u32 offset = gpu_input_.alloc(num_bytes);
+  if (gpu_input_.blockFull()) [[unlikely]] {
+    gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
+
+    offset = gpu_input_.offset;
+    gpu_input_.offset += num_bytes;
+  }
+
+  return MappedTmpBuffer {
+    .buffer = gpu_input_.buffer,
+    .offset = offset,
+    .ptr = gpu_input_.ptr,
+  };
+}
+
+CopyPassEncoder::CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
+                                 GPUQueue queue, GPUTmpInputBlock gpu_input)
   : gpu_(gpu),
     writer_(writer),
+    queue_(queue),
+    gpu_input_(gpu_input),
     ctrl_(CommandCtrl::None),
     state_()
 {}
@@ -552,6 +580,7 @@ void CommandEncoder::endRasterPass(RasterPassEncoder &render_enc)
 {
   cmd_writer_ = render_enc.writer_;
   cmd_writer_.ctrl(gpu_, CommandCtrl::None);
+  gpu_input_ = render_enc.gpu_input_;
 }
 
 ComputePassEncoder CommandEncoder::beginComputePass()
@@ -567,13 +596,14 @@ void CommandEncoder::endComputePass(ComputePassEncoder &compute_enc)
 CopyPassEncoder CommandEncoder::beginCopyPass()
 {
   cmd_writer_.ctrl(gpu_, CommandCtrl::CopyPass);
-  return CopyPassEncoder(gpu_, cmd_writer_);
+  return CopyPassEncoder(gpu_, cmd_writer_, queue_, gpu_input_);
 }
 
 void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
 {
   cmd_writer_ = copy_enc.writer_;
   cmd_writer_.ctrl(gpu_, CommandCtrl::None);
+  gpu_input_ = copy_enc.gpu_input_;
 }
 
 Buffer GPURuntime::createBuffer(BufferInit init,

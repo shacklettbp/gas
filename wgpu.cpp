@@ -1719,10 +1719,12 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
       auto [to_gpu_tmp_buffer, _1, _2] =
           buffers.get(gpu_tmp_input_state.bufferHandlesBase, num_buffers - 1);
 
-      u32 cur_offset = u32(gpu_tmp_input_state.curFreeRange);
+      u32 global_offset = u32(gpu_tmp_input_state.curFreeRange);
+      u32 local_offset = global_offset -
+          (num_buffers - 1) * TmpDynamicUniformData::NUM_BLOCKS;
 
       wgpu_enc.WriteBuffer(*to_gpu_tmp_buffer, 0,
-          tmp_dyn_uniform.ptr, cur_offset * GPUTmpInputBlock::BLOCK_SIZE);
+          tmp_dyn_uniform.ptr, local_offset * GPUTmpInputBlock::BLOCK_SIZE);
     }
 
     gpu_tmp_input_state.curFreeRange = (u64(end_offset) << 32) | 0;

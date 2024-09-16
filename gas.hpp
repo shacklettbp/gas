@@ -584,7 +584,7 @@ private:
 
   inline RasterPassEncoder(GPURuntime *gpu,
                            CommandWriter writer,
-                           GPUQueue queue_,
+                           GPUQueue queue,
                            GPUTmpInputBlock gpu_input);
 
   GPURuntime *gpu_;
@@ -617,11 +617,16 @@ public:
 
   inline void clearBuffer(Buffer buffer, u32 offset, u32 num_bytes);
 
+  inline MappedTmpBuffer tmpBuffer(u32 num_bytes);
+
 private:
-  inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer);
+  inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
+                         GPUQueue queue, GPUTmpInputBlock gpu_input);
 
   GPURuntime *gpu_;
   CommandWriter writer_;
+  GPUQueue queue_;
+  GPUTmpInputBlock gpu_input_;
   CommandCtrl ctrl_;
   CopyCommand state_;
 
@@ -817,6 +822,8 @@ protected:
 
 friend class CommandEncoder;
 friend class RasterPassEncoder;
+friend class ComputePassEncoder;
+friend class CopyPassEncoder;
 friend class CommandWriter;
 };
 

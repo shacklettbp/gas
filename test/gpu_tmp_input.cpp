@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-TEST(GPUTmpInput, SmallTmpData)
+TEST(GPUTmpInput, MultiBlock)
 {
   using namespace gas;
 
@@ -109,8 +109,16 @@ TEST(GPUTmpInput, SmallTmpData)
     }
 
     {
+      CopyPassEncoder copy_enc = enc.beginCopyPass();
+      for (i32 j = 0; j < 65; j++) {
+        copy_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+      }
+      enc.endCopyPass(copy_enc);
+    }
+
+    {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
-      //raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+      raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
 
       raster_enc.setShader(shader);
       raster_enc.drawData(Vector3 { 1, iter_v, 1 });
