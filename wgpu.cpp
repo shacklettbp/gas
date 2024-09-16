@@ -896,7 +896,7 @@ void * Backend::beginReadback(Buffer buffer)
 
   assert(to_buffer->GetMapState() == wgpu::BufferMapState::Mapped);
 
-  return to_buffer->GetMappedRange();
+  return (void *)to_buffer->GetConstMappedRange();
 }
 
 void Backend::endReadback(Buffer buffer)
