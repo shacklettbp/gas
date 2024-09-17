@@ -850,6 +850,7 @@ public:
   inline void submit(GPUQueue queue, CommandEncoder &enc);
 
   virtual void waitUntilReady(GPUQueue queue) = 0;
+  virtual void waitUntilWorkFinished(GPUQueue queue) = 0;
   virtual void waitUntilIdle() = 0;
 
   // ==== Swapchain & presentation ============================================

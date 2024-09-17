@@ -319,6 +319,7 @@ public:
   void presentSwapchainImage(Swapchain swapchain) final;
 
   void waitUntilReady(GPUQueue queue_hdl) final;
+  void waitUntilWorkFinished(GPUQueue queue_hdl) final;
 
   void waitUntilIdle() final;
 

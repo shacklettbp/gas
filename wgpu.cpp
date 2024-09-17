@@ -1786,6 +1786,12 @@ void Backend::waitUntilReady(GPUQueue queue_hdl)
   }
 }
 
+void Backend::waitUntilWorkFinished(GPUQueue)
+{
+  inst.ProcessEvents();
+  // Essentially a no-op on webgpu
+}
+
 void Backend::waitUntilIdle()
 {
   inst.ProcessEvents();

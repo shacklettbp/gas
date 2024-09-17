@@ -54,8 +54,22 @@ int main(int argc, char *argv[])
       window->surface, &swapchain_properties);
 
   GPUQueue main_queue = gpu->getMainQueue();
-  ImGuiSystem::init(wm, gpu, main_queue, shaderc, swapchain_properties.format,
+
+  RasterPassInterface imgui_pass_interface = gpu->createRasterPassInterface({
+    .uuid = "imgui_raster_pass"_to_uuid,
+    .colorAttachments = {{
+        .format = swapchain_properties.format,
+        .loadMode = AttachmentLoadMode::Load,
+    }},
+  });
+
+  ImGuiSystem::init(wm, gpu, main_queue, shaderc, imgui_pass_interface,
       GAS_EXAMPLES_DIR "imgui_font.ttf", 16.f);
+
+  RasterPass imgui_pass = gpu->createRasterPass({
+    .interface = imgui_pass_interface,
+    .colorAttachments = { swapchain.proxyAttachment() },
+  });
 
   shaderc_lib.destroyCompiler(shaderc);
 
@@ -119,6 +133,8 @@ int main(int argc, char *argv[])
       if (should_exit || window->shouldClose) {
         break;
       }
+
+      ImGuiSystem::beginFrame(gpu);
     }
 
     gpu->waitUntilReady(main_queue);
@@ -142,6 +158,13 @@ int main(int argc, char *argv[])
 
       enc.endRasterPass(raster_enc);
     }
+
+    {
+      RasterPassEncoder raster_enc = enc.beginRasterPass(imgui_pass);
+      ImGuiSystem::endFrame(raster_enc);
+      enc.endRasterPass(raster_enc);
+    }
+
     enc.endEncoding();
     gpu->submit(main_queue, enc);
 
@@ -150,8 +173,7 @@ int main(int argc, char *argv[])
     frame_num += 1;
   }
 
-  gpu->waitUntilReady(main_queue);
-
+  gpu->waitUntilWorkFinished(main_queue);
   gpu->waitUntilIdle();
 
   gpu->destroyCommandEncoder(enc);
@@ -170,7 +192,11 @@ int main(int argc, char *argv[])
 
   gpu->destroyRasterShader(shader);
 
+  gpu->destroyRasterPass(imgui_pass);
+
   ImGuiSystem::shutdown(gpu);
+
+  gpu->destroyRasterPassInterface(imgui_pass_interface);
 
   gpu->destroySwapchain(swapchain);
 

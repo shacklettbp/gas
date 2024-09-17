@@ -10,7 +10,6 @@ struct ImGuiBackend {
   WindowManager *wm;
 
   ParamBlockType paramBlockType;
-  RasterPassInterface rasterPassInterface;
   RasterShader shader;
   Sampler fontSampler;
   Texture fontsTexture;
@@ -81,6 +80,10 @@ void loadFonts(GPURuntime *gpu,
     .initData = { .ptr = atlas_pixels },
   }, tx_queue);
 
+  gpu->waitUntilWorkFinished(tx_queue);
+
+  io.Fonts->ClearTexData();
+
   bd->fontsParamBlock = gpu->createParamBlock({
     .typeID = bd->paramBlockType,
     .textures = { bd->fontsTexture },
@@ -98,23 +101,25 @@ void unloadFonts(GPURuntime *gpu)
 
   gpu->destroyParamBlock(bd->fontsParamBlock);
   gpu->destroyTexture(bd->fontsTexture);
+
+  io.Fonts->ClearFonts();
 }
 
 }
 
 namespace ImGuiSystem {
 
-void init(WindowManager &wm,
-          GPURuntime *gpu,
-          GPUQueue tx_queue,
-          ShaderCompiler *shaderc,
-          TextureFormat attachment_fmt,
-          const char *font_path,
-          float font_size)
+void init(
+    WindowManager &wm,
+    GPURuntime *gpu,
+    GPUQueue tx_queue,
+    ShaderCompiler *shaderc,
+    RasterPassInterface raster_pass_interface,
+    const char *font_path,
+    float font_size)
 {
   using enum ShaderStage;
   using enum SamplerAddressMode;
-  using enum AttachmentLoadMode;
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -156,15 +161,8 @@ void init(WindowManager &wm,
     },
   });
 
-  bd->rasterPassInterface = gpu->createRasterPassInterface({
-    .uuid = "imgui_raster_pass"_to_uuid,
-    .colorAttachments = {
-      { .format = attachment_fmt, .loadMode = Load },
-    },
-  });
-
   bd->shader = loadShader(
-      gpu, shaderc, bd->paramBlockType, bd->rasterPassInterface);
+      gpu, shaderc, bd->paramBlockType, raster_pass_interface);
 
   bd->fontSampler = gpu->createSampler({
     .addressMode = Repeat,
@@ -182,7 +180,6 @@ void shutdown(GPURuntime *gpu)
   unloadFonts(gpu);
   gpu->destroySampler(bd->fontSampler);
   gpu->destroyRasterShader(bd->shader);
-  gpu->destroyRasterPassInterface(bd->rasterPassInterface);
   gpu->destroyParamBlockType(bd->paramBlockType);
 
   delete bd;
@@ -202,11 +199,47 @@ void reloadFonts(GPURuntime *gpu,
 
 void beginFrame(GPURuntime *gpu)
 {
-
+  (void)gpu;
+  ImGui::NewFrame();
 }
 
-void endFrame(GPURuntime *gpu)
+void endFrame(RasterPassEncoder &enc)
 {
+  ImGuiIO &io = ImGui::GetIO();
+  auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+
+  ImGui::Render();
+  ImDrawData *draw_data = ImGui::GetDrawData();
+
+  struct ImDrawData
+  {
+    bool                Valid;              // Only valid after Render() is called and before the next NewFrame() is called.
+    int                 CmdListsCount;      // Number of ImDrawList* to render (should always be == CmdLists.size)
+    int                 TotalIdxCount;      // For convenience, sum of all ImDrawList's IdxBuffer.Size
+    int                 TotalVtxCount;      // For convenience, sum of all ImDrawList's VtxBuffer.Size
+    ImVector<ImDrawList*> CmdLists;         // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
+    ImVec2              DisplayPos;         // Top-left position of the viewport to render (== top-left of the orthogonal projection matrix to use) (== GetMainViewport()->Pos for the main viewport, == (0.0) in most single-viewport applications)
+    ImVec2              DisplaySize;        // Size of the viewport to render (== GetMainViewport()->Size for the main viewport, == io.DisplaySize in most single-viewport applications)
+    ImVec2              FramebufferScale;   // Amount of pixels for each unit of DisplaySize. Based on io.DisplayFramebufferScale. Generally (1,1) on normal display, (2,2) on OSX with Retina display.
+    ImGuiViewport*      OwnerViewport;      // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
+
+  };
+
+  MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
+    sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
+
+  MappedTmpBuffer tmp_indices = enc.tmpBuffer(
+    sizeof(u16) * draw_data->TotalIdxCount);
+
+  u32 cur_vert_offset = utils::divideRoundUp(
+      tmp_vertices.offset, sizeof(ImDrawVert));
+  u32 cur_idx_offset = 0;
+  for (i32 cmd_list_idx = 0; cmd_list_idx < (i32)draw_data->CmdListsCount;
+       cmd_list_idx++) {
+    ImDrawList *list = draw_data->CmdLists[cmd_list_idx];
+    
+  }
+
 }
 
 }
