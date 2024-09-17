@@ -1,4 +1,6 @@
 set(IMGUI_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/imgui")
+set(IMGUI_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/imgui-build-stamp")
+set(IMGUI_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/imgui-build-config-hash")
 
 function(fetch_imgui)
   FetchContent_Populate(imgui-bundled
@@ -9,7 +11,11 @@ function(fetch_imgui)
     GIT_SUBMODULES_RECURSE OFF
     SOURCE_DIR "${IMGUI_BUNDLED_DIR}"
   )
-  set(FETCHCONTENT_QUIET TRUE)
+
+  file(SHA512 "${CMAKE_CURRENT_LIST_FILE}" IMGUI_CONFIG_FILE_HASH)
+
+  file(TOUCH "${IMGUI_BUILD_TIMESTAMP_FILE}")
+  file(WRITE "${IMGUI_BUILD_CONFIG_HASH_FILE}" "${IMGUI_CONFIG_FILE_HASH}")
 endfunction()
 
 function(check_fetch_imgui)
