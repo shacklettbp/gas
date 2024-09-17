@@ -341,6 +341,10 @@ public:
   inline i32 allocTmpDynUniformBuffer(
       GPUTmpInputState &state);
 
+  i32 unmapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input);
+  void mapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input,
+                               i32 num_active_staging_buffers);
+
   void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };
 

@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
         .numBytes = 16, 
         .usage = BufferUsage::ShaderUniform,
         .initData = { .ptr = &init },
-      });
+      }, main_queue);
   }
 
   ParamBlockType global_param_blk_type = gpu->createParamBlockType({

@@ -697,7 +697,40 @@ void Backend::createGPUResources(i32 num_buffers,
     }
   }
 
-  wgpu::CommandEncoder copy_enc = dev.CreateCommandEncoder();
+  wgpu::CommandEncoder upload_enc;
+  GPUTmpInputBlock staging_block {};
+  if (tx_queue.id != -1) {
+    upload_enc = dev.CreateCommandEncoder();
+    waitUntilReady(tx_queue);
+  }
+
+  auto stagingAlloc = [this, tx_queue, &staging_block]
+    (u32 num_bytes) -> StagingHandle 
+  {
+    if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) {
+      return {
+        .buffer = {},
+        .offset = 0,
+        .ptr = nullptr,
+      }; 
+    }
+    
+    // FIXME move to validation
+    assert(tx_queue.id != -1);
+
+    u32 offset = staging_block.alloc(num_bytes);
+    if (staging_block.blockFull()) {
+      staging_block = allocGPUTmpInputBlock(tx_queue);
+      staging_block.offset += num_bytes;
+      offset = 0;
+    }
+
+    return {
+      staging_block.buffer,
+      offset,
+      staging_block.ptr + offset,
+    };
+  };
 
   for (i32 buf_idx = 0; buf_idx < num_buffers; buf_idx++) {
     const BufferInit &buf_init = buffer_inits[buf_idx];
@@ -706,22 +739,29 @@ void Backend::createGPUResources(i32 num_buffers,
 
     wgpu::BufferUsage wgpu_usage = convertBufferUsage(buf_init.usage);
 
-    void *init_ptr = buf_init.initData.ptr;
+    StagingHandle staging = buf_init.initData;
+    if (staging.ptr) {
+      wgpu_usage |= wgpu::BufferUsage::CopyDst;
+    }
 
     wgpu::BufferDescriptor buf_desc {
       .usage = wgpu_usage,
       .size = buf_init.numBytes,
-      .mappedAtCreation = init_ptr != nullptr,
+      .mappedAtCreation = false,
     };
 
     new (to_hot) wgpu::Buffer(dev.CreateBuffer(&buf_desc));
     *to_cold = buf_init;
     buffer_handles_out[buf_idx] = id;
 
-    if (init_ptr) {
-      void *dst = to_hot->GetMappedRange();
-      memcpy(dst, init_ptr, buf_init.numBytes);
-      to_hot->Unmap();
+    if (staging.ptr) {
+      if (staging.buffer.null()) {
+        staging = stagingAlloc(buf_init.numBytes);
+        memcpy(staging.ptr, buf_init.initData.ptr, buf_init.numBytes);
+      }
+
+      upload_enc.CopyBufferToBuffer(*buffers.hot(staging.buffer), 0,
+                                    *to_hot, 0, buf_init.numBytes);
     }
   }
 
@@ -741,13 +781,22 @@ void Backend::createGPUResources(i32 num_buffers,
       dim = wgpu::TextureDimension::e3D;
     }
 
+    u32 width = (u32)tex_init.width;
+    u32 height = tex_init.height != 0 ? (u32)tex_init.height : 1;
+    u32 depth = tex_init.depth != 0 ? (u32)tex_init.depth : 1;
+
+    StagingHandle staging = tex_init.initData;
+    if (staging.ptr) {
+      wgpu_usage |= wgpu::TextureUsage::CopyDst;
+    }
+
     wgpu::TextureDescriptor tex_desc {
       .usage = wgpu_usage,
       .dimension = dim,
       .size = {
-        .width = (u32)tex_init.width,
-        .height = tex_init.height != 0 ? (u32)tex_init.height : 1,
-        .depthOrArrayLayers = tex_init.depth != 0 ? (u32)tex_init.depth : 1,
+        .width = width,
+        .height = height,
+        .depthOrArrayLayers = depth,
       },
       .format = convertTextureFormat(tex_init.format),
       .mipLevelCount = (u32)tex_init.numMipLevels,
@@ -766,12 +815,13 @@ void Backend::createGPUResources(i32 num_buffers,
 
     wgpu::TextureView wgpu_tex_view = wgpu_tex.CreateView(&view_desc);
 
+    u32 bytes_per_texel = bytesPerTexelForFormat(tex_init.format);
     new (to_cold) BackendTextureCold {
       .texture = std::move(wgpu_tex),
-      .baseWidth = tex_desc.size.width,
-      .baseHeight = tex_desc.size.height,
-      .baseDepth = tex_desc.size.depthOrArrayLayers,
-      .numBytesPerTexel = bytesPerTexelForFormat(tex_init.format),
+      .baseWidth = width,
+      .baseHeight = height,
+      .baseDepth = depth,
+      .numBytesPerTexel = bytes_per_texel,
     };
 
     new (to_hot) BackendTexture {
@@ -779,6 +829,51 @@ void Backend::createGPUResources(i32 num_buffers,
     };
 
     texture_handles_out[tex_idx] = id;
+
+    assert(tex_init.numMipLevels == 1);
+    u32 num_bytes = width * height * depth * bytes_per_texel;
+
+    if (staging.ptr) {
+      if (staging.buffer.null()) {
+        staging = stagingAlloc(num_bytes);
+        memcpy(staging.ptr, tex_init.initData.ptr, num_bytes);
+      }
+
+      u32 cur_offset = staging.offset;
+      u32 mip_idx = 0;
+
+      wgpu::ImageCopyBuffer src {
+        .layout = {
+          .offset = cur_offset,
+          .bytesPerRow = width * bytes_per_texel,
+        },
+        .buffer = *buffers.hot(staging.buffer),
+      };
+
+      wgpu::ImageCopyTexture dst {
+        .texture = to_cold->texture,
+        .mipLevel = mip_idx,
+      };
+
+      wgpu::Extent3D copy_size {
+        .width = width,
+        .height = height,
+        .depthOrArrayLayers = depth,
+      };
+
+      upload_enc.CopyBufferToTexture(&src, &dst, &copy_size);
+    }
+  }
+
+  if (tx_queue.id != -1) {
+    GPUTmpInputState &gpu_tmp_input = queueDatas[tx_queue.id].gpuTmpInput;
+    i32 num_active_staging_buffers =
+        unmapActiveStagingBuffers(gpu_tmp_input);
+
+    wgpu::CommandBuffer cmd_buf = upload_enc.Finish();
+    queue.Submit(1, &cmd_buf);
+
+    mapActiveStagingBuffers(gpu_tmp_input, num_active_staging_buffers);
   }
 }
 
@@ -1795,6 +1890,35 @@ GPUTmpInputBlock Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl)
   }
 }
 
+i32 Backend::unmapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input)
+{
+  u32 end_offset = u32(gpu_tmp_input.curStagingRange >> 32);
+  i32 num_active_staging_buffers = (i32)end_offset / NUM_BLOCKS_PER_TMP_BUFFER;
+
+  for (i32 i = 0; i < num_active_staging_buffers; i++) {
+    i32 staging_belt_idx = gpu_tmp_input.activeStagingBuffers[i];
+    stagingBelt.buffers[staging_belt_idx].Unmap();
+  }
+
+  return num_active_staging_buffers;
+}
+
+void Backend::mapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input,
+                                      i32 num_active_staging_buffers)
+{
+  for (i32 i = 0; i < num_active_staging_buffers; i++) {
+    i32 staging_belt_idx = gpu_tmp_input.activeStagingBuffers[i];
+    wgpu::Buffer &staging_buf = stagingBelt.buffers[staging_belt_idx];
+    staging_buf.MapAsync(wgpu::MapMode::Write, 0,
+        TMP_BUFFER_SIZE,
+        wgpu::CallbackMode::AllowSpontaneous,
+        returnBufferToStagingBeltCallback,
+        (void *)&stagingBelt.cbStates[staging_belt_idx]);
+
+    gpu_tmp_input.stagingBeltIdxToDynUniform[staging_belt_idx] = -1;
+  }
+}
+
 void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 {
 #ifdef GAS_WGPU_DEBUG_PRINT
@@ -1809,16 +1933,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
   wgpu::CommandEncoder wgpu_enc = dev.CreateCommandEncoder();
 
   GPUTmpInputState &gpu_tmp_input = queue_data.gpuTmpInput;
-  i32 num_active_staging_buffers;
-  {
-    u32 end_offset = u32(gpu_tmp_input.curStagingRange >> 32);
-    num_active_staging_buffers = end_offset / NUM_BLOCKS_PER_TMP_BUFFER;
-
-    for (i32 i = 0; i < num_active_staging_buffers; i++) {
-      i32 staging_belt_idx = gpu_tmp_input.activeStagingBuffers[i];
-      stagingBelt.buffers[staging_belt_idx].Unmap();
-    }
-  }
+  i32 num_active_staging_buffers = unmapActiveStagingBuffers(gpu_tmp_input);
 
   CommandDecoder decoder(cmds);
 
@@ -2128,17 +2243,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
   cmd_buffers[num_cmd_buffers++] = wgpu_enc.Finish();
   queue.Submit(num_cmd_buffers, cmd_buffers.data());
 
-  for (i32 i = 0; i < num_active_staging_buffers; i++) {
-    i32 staging_belt_idx = gpu_tmp_input.activeStagingBuffers[i];
-    wgpu::Buffer &staging_buf = stagingBelt.buffers[staging_belt_idx];
-    staging_buf.MapAsync(wgpu::MapMode::Write, 0,
-        TMP_BUFFER_SIZE,
-        wgpu::CallbackMode::AllowSpontaneous,
-        returnBufferToStagingBeltCallback,
-        (void *)&stagingBelt.cbStates[staging_belt_idx]);
-
-    gpu_tmp_input.stagingBeltIdxToDynUniform[staging_belt_idx] = -1;
-  }
+  mapActiveStagingBuffers(gpu_tmp_input, num_active_staging_buffers);
 }
 
 BackendRasterPassConfig * Backend::getRasterPassConfigByID(
