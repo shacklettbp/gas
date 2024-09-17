@@ -82,51 +82,53 @@ struct BackendRasterShader {
 
 struct NoMetadata {};
 
-static constexpr i32 MAX_GPU_TMP_INPUT_BUFFERS = 16;
+constexpr inline u32 TMP_BUFFER_SIZE = 64 * 1024 * 1024;
+constexpr inline i32 MAX_TMP_BUFFERS_PER_QUEUE = 16;
+constexpr inline i32 MAX_TMP_STAGING_BUFFERS = 64;
+constexpr inline u32 NUM_BLOCKS_PER_TMP_BUFFER =
+  TMP_BUFFER_SIZE / GPUTmpInputBlock::BLOCK_SIZE;
 
 struct StagingBelt {
-  static constexpr inline i32 MAX_STAGING_BUFFERS = 64;
   struct CallbackState {
     Backend *backend;
     i32 idx;
   };
 
-  std::array<wgpu::Buffer, MAX_STAGING_BUFFERS> buffers;
-  std::array<u8 *, MAX_STAGING_BUFFERS> ptrs;
+  std::array<wgpu::Buffer, MAX_TMP_STAGING_BUFFERS> buffers;
+  std::array<u8 *, MAX_TMP_STAGING_BUFFERS> ptrs;
 
-  std::array<CallbackState, MAX_STAGING_BUFFERS> cbStates;
+  std::array<CallbackState, MAX_TMP_STAGING_BUFFERS> cbStates;
 
-  std::array<i32, MAX_STAGING_BUFFERS> freeList;
+  std::array<i32, MAX_TMP_STAGING_BUFFERS> freeList;
   i32 numFree;
   i32 numAllocated;
+
+  u32 stagingBufferHandlesBase;
 
   SpinLock lock;
 };
 
-struct TmpDynamicUniformData {
-  static constexpr inline u32 BUFFER_SIZE = 64 * 1024 * 1024;
-  static constexpr inline u32 NUM_BLOCKS =
-      BUFFER_SIZE / GPUTmpInputBlock::BLOCK_SIZE;
-
+struct TmpDynUniformBuffer {
+  wgpu::Buffer buffer;
   wgpu::BindGroup bindGroup;
-  i32 stagingBeltIndex;
 };
 
 struct GPUTmpInputState {
-  static constexpr inline i32 MAX_BUFFERS = 16;
+  std::array<TmpDynUniformBuffer, MAX_TMP_BUFFERS_PER_QUEUE>
+      dynUniformBuffers;
 
-  std::array<TmpDynamicUniformData, MAX_BUFFERS> buffers;
-  u32 bufferHandlesBase;
+  std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> activeStagingBuffers;
 
-  alignas(MADRONA_CACHE_LINE) u64 curFreeRange;
+  std::array<i32, MAX_TMP_STAGING_BUFFERS> stagingBeltIdxToDynUniform;
+
+  alignas(MADRONA_CACHE_LINE) u64 curStagingRange;
+  alignas(MADRONA_CACHE_LINE) u32 numDynUniforms;
+  u32 maxNumUsedDynUniforms;
+  SpinLock lock {};
 };
 
 struct BackendQueueData {
-  GPUTmpInputState gpuTmpInput[2];
-  SpinLock allocLock {};
-
-  i32 curFrame;
-  i32 numFrames;
+  GPUTmpInputState gpuTmpInput;
 };
 
 class WebGPUAPI final : public GPUAPI {
@@ -144,8 +146,6 @@ public:
   GPURuntime * createRuntime(
       i32 gpu_idx, Span<const Surface> surfaces) final;
   void destroyRuntime(GPURuntime *runtime) final;
-
-  void processGraphicsEvents() final;
 
   ShaderByteCodeType backendShaderByteCodeType() final;
 };
@@ -332,12 +332,14 @@ public:
   inline wgpu::BindGroupLayout getBindGroupLayoutByParamBlockTypeID(
       ParamBlockTypeID id);
 
-  i32 allocBlockFromStagingBelt();
-  static void returnBlockToStagingBeltCallback(
+  i32 allocStagingBufferFromBelt();
+  static void returnBufferToStagingBeltCallback(
     wgpu::MapAsyncStatus async_status, const char *msg, void *user_data);
 
-  inline TmpDynamicUniformData allocTmpDynamicUniformData(
-      u32 buffer_handle_idx);
+  //void allocTmpDynUniformBlock(BackendQueueData &queue_data);
+
+  inline i32 allocTmpDynUniformBuffer(
+      GPUTmpInputState &state);
 
   void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };

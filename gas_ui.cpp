@@ -359,8 +359,6 @@ bool WindowManager::processEvents()
   } while (num_events == events.size());
 #endif
 
-  impl_->gpuAPI->processGraphicsEvents();
-
   return should_quit;
 }
 

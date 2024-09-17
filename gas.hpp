@@ -130,7 +130,6 @@ enum class BufferUsage : u16 {
   DrawVertex    = 1 << 3,
   ShaderUniform = 1 << 4,
   ShaderStorage = 1 << 5,
-  CPUAccessible = 1 << 6,
 };
 inline BufferUsage & operator|=(BufferUsage &a, BufferUsage b);
 inline BufferUsage operator|(BufferUsage a, BufferUsage b);
@@ -901,8 +900,6 @@ public:
   virtual GPURuntime * createRuntime(
     i32 gpu_idx, Span<const Surface> surfaces = {}) = 0;
   virtual void destroyRuntime(GPURuntime *runtime) = 0;
-
-  virtual void processGraphicsEvents() = 0;
 
   virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
 };

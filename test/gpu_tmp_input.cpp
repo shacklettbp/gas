@@ -100,9 +100,9 @@ TEST_F(GPUTmpInput, MultiRasterPass)
 
   CommandEncoder enc = gpu->createCommandEncoder(main_queue_);
   const i32 num_iters = 8;
-  for (i32 i = 0; i < num_iters; i++) {
-    gpuAPI->processGraphicsEvents();
 
+  gpu->waitUntilReady(main_queue_);
+  for (i32 i = 0; i < num_iters; i++) {
     enc.beginEncoding();
 
     u8 *base;
@@ -172,7 +172,6 @@ TEST_F(GPUTmpInput, MultiRasterPass)
     }
   }
 
-  gpuAPI->processGraphicsEvents();
   gpu->waitUntilReady(main_queue_);
 
   gpu->destroyCommandEncoder(enc);
@@ -216,9 +215,8 @@ TEST_F(GPUTmpInput, MultiBlock)
 
   CommandEncoder enc = gpu->createCommandEncoder(main_queue_);
   const i32 num_iters = 16; 
+  gpu->waitUntilReady(main_queue_);
   for (i32 i = 0; i < num_iters; i++) {
-    gpuAPI->processGraphicsEvents();
-
     enc.beginEncoding();
 
     f32 iter_v = f32(i) / (num_iters - 1);
@@ -292,7 +290,6 @@ TEST_F(GPUTmpInput, MultiBlock)
     }
   }
 
-  gpuAPI->processGraphicsEvents();
   gpu->waitUntilReady(main_queue_);
 
   gpu->destroyCommandEncoder(enc);
