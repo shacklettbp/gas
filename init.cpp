@@ -78,7 +78,7 @@ ShaderCompilerLib loadShaderCompiler()
   auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
       handle, "gasCreateShaderCompiler");
   auto destroy_fn = (void (*)(ShaderCompiler *))GetProcAddress(
-      lib, "gasDestroyShaderCompiler");
+      handle, "gasDestroyShaderCompiler");
 
   if (!create_fn || !destroy_fn) {
     FATAL("Failed to find create / destroy functions in shader compiler library: %u",

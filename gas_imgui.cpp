@@ -211,6 +211,7 @@ void endFrame(RasterPassEncoder &enc)
   ImGui::Render();
   ImDrawData *draw_data = ImGui::GetDrawData();
 
+#if 0
   struct ImDrawData
   {
     bool                Valid;              // Only valid after Render() is called and before the next NewFrame() is called.
@@ -224,6 +225,7 @@ void endFrame(RasterPassEncoder &enc)
     ImGuiViewport*      OwnerViewport;      // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
 
   };
+#endif
 
   MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
     sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
@@ -232,8 +234,9 @@ void endFrame(RasterPassEncoder &enc)
     sizeof(u16) * draw_data->TotalIdxCount);
 
   u32 cur_vert_offset = utils::divideRoundUp(
-      tmp_vertices.offset, sizeof(ImDrawVert));
-  u32 cur_idx_offset = 0;
+      tmp_vertices.offset, (u32)sizeof(ImDrawVert));
+  u32 cur_idx_offset = tmp_indices.offset / sizeof(u16);
+
   for (i32 cmd_list_idx = 0; cmd_list_idx < (i32)draw_data->CmdListsCount;
        cmd_list_idx++) {
     ImDrawList *list = draw_data->CmdLists[cmd_list_idx];
