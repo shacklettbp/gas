@@ -24,7 +24,7 @@ RasterShader loadShader(GPURuntime *gpu,
 {
   StackAlloc alloc;
   ShaderCompileResult compiled_shader = shaderc->compileShader(alloc, {
-    .path = GAS_SHADER_DIR "imgui.slang",
+    .path = GAS_IMGUI_SHADER_DIR "imgui.slang",
   });
 
   if (!compiled_shader.success) {
@@ -55,10 +55,20 @@ RasterShader loadShader(GPURuntime *gpu,
 }
 
 void loadFonts(GPURuntime *gpu,
-               GPUQueue tx_queue)
+               GPUQueue tx_queue,
+               const char *font_path,
+               float font_size)
 {
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+
+  float scale_factor = 2.f;
+
+  float scaled_font_size = font_size * scale_factor;
+  io.Fonts->AddFontFromFileTTF(font_path, scaled_font_size);
+
+  auto &style = ImGui::GetStyle();
+  style.ScaleAllSizes(scale_factor);
 
   u8 *atlas_pixels;
   int atlas_width, atlas_height;
@@ -98,7 +108,9 @@ void init(WindowManager &wm,
           GPURuntime *gpu,
           GPUQueue tx_queue,
           ShaderCompiler *shaderc,
-          TextureFormat attachment_fmt)
+          TextureFormat attachment_fmt,
+          const char *font_path,
+          float font_size)
 {
   using enum ShaderStage;
   using enum SamplerAddressMode;
@@ -159,13 +171,7 @@ void init(WindowManager &wm,
     .anisotropy = 1,
   });
 
-  loadFonts(gpu, tx_queue);
-}
-
-void reloadAssets(GPURuntime *gpu, GPUQueue tx_queue)
-{
-  unloadFonts(gpu);
-  loadFonts(gpu, tx_queue);
+  loadFonts(gpu, tx_queue, font_path, font_size);
 }
 
 void shutdown(GPURuntime *gpu)
@@ -183,6 +189,24 @@ void shutdown(GPURuntime *gpu)
   io.BackendRendererName = nullptr;
   io.BackendPlatformName = nullptr;
   io.BackendPlatformUserData = nullptr;
+}
+
+void reloadFonts(GPURuntime *gpu,
+                 GPUQueue tx_queue,
+                 const char *font_path,
+                 float font_size)
+{
+  unloadFonts(gpu);
+  loadFonts(gpu, tx_queue, font_path, font_size);
+}
+
+void beginFrame(GPURuntime *gpu)
+{
+
+}
+
+void endFrame(GPURuntime *gpu)
+{
 }
 
 }

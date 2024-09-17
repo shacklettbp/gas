@@ -48,10 +48,6 @@ add_library(gas_core STATIC
   ${GAS_CORE_SOURCES}
 )
 
-target_compile_definitions(gas_core PUBLIC 
-  GAS_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\"
-)
-
 target_link_libraries(gas_core PRIVATE
   madrona_common
 )
@@ -74,6 +70,10 @@ endif()
 
 add_library(gas_imgui STATIC
   gas_imgui.hpp gas_imgui.cpp
+)
+
+target_compile_definitions(gas_imgui PRIVATE 
+  GAS_IMGUI_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\"
 )
 
 target_link_libraries(gas_imgui
@@ -130,16 +130,5 @@ if (GAS_USE_DAWN)
   target_link_libraries(gas_shader_compiler PRIVATE gas_dawn gas_dawn_tint)
 endif()
 
-add_executable(gas_frontend
-  frontend.cpp 
-)
-
-target_link_libraries(gas_frontend
-  PRIVATE 
-    gas_core
-    gas_ui
-    gas_imgui
-    madrona_common
-)
-
+add_subdirectory(examples)
 add_subdirectory(test)

@@ -1,12 +1,6 @@
-#include "gas_ui.hpp"
-#include "gas_imgui.hpp"
-#include "shader_compiler.hpp"
-
-namespace gas {
-
-
-
-}
+#include <gas/gas_ui.hpp>
+#include <gas/gas_imgui.hpp>
+#include <gas/shader_compiler.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -38,7 +32,7 @@ int main(int argc, char *argv[])
   {
     ShaderCompileResult compile_result =
       shaderc->compileShader(shaderc_alloc, {
-        .path = GAS_SHADER_DIR "basic.slang",
+        .path = GAS_EXAMPLES_DIR "basic.slang",
       });
 
     if (compile_result.diagnostics.size() != 0) {
@@ -60,7 +54,8 @@ int main(int argc, char *argv[])
       window->surface, &swapchain_properties);
 
   GPUQueue main_queue = gpu->getMainQueue();
-  ImGuiSystem::init(wm, gpu, main_queue, shaderc, swapchain_properties.format);
+  ImGuiSystem::init(wm, gpu, main_queue, shaderc, swapchain_properties.format,
+      GAS_EXAMPLES_DIR "imgui_font.ttf", 16.f);
 
   shaderc_lib.destroyCompiler(shaderc);
 
