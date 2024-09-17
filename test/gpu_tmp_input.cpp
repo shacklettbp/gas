@@ -99,74 +99,77 @@ TEST_F(GPUTmpInput, MultiRasterPass)
   Buffer readback = gpu->createReadbackBuffer(2 * (u32)res * (u32)res * 4);
 
   CommandEncoder enc = gpu->createCommandEncoder(main_queue_);
-  gpuAPI->processGraphicsEvents();
+  const i32 num_iters = 8;
+  for (i32 i = 0; i < num_iters; i++) {
+    gpuAPI->processGraphicsEvents();
 
-  enc.beginEncoding();
+    enc.beginEncoding();
 
-  u8 *base;
-  {
-    RasterPassEncoder raster_enc = enc.beginRasterPass(rp0);
-    base = raster_enc.tmpBuffer(1).ptr;
+    u8 *base;
+    {
+      RasterPassEncoder raster_enc = enc.beginRasterPass(rp0);
+      base = raster_enc.tmpBuffer(1).ptr;
 
-    raster_enc.setShader(shader_);
-    raster_enc.drawData(Vector3 { 1, 1, 0 });
-    u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
-    EXPECT_EQ(post_draw_data - base, 512);
-    raster_enc.draw(0, 1);
-    enc.endRasterPass(raster_enc);
-  }
-
-  {
-    RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
-    raster_enc.setShader(shader_);
-    u8 *new_pass_data = raster_enc.tmpBuffer(1).ptr;
-    EXPECT_EQ(new_pass_data - base, 768);
-    raster_enc.drawData(Vector3 { 1, 0, 1 });
-    u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
-    EXPECT_EQ(post_draw_data - base, 1280);
-    raster_enc.draw(0, 1);
-    enc.endRasterPass(raster_enc);
-  }
-
-  {
-    CopyPassEncoder copy_enc = enc.beginCopyPass();
-
-    copy_enc.copyTextureToBuffer(
-        attachment0, readback, 0, 0);
-
-    copy_enc.copyTextureToBuffer(
-        attachment1, readback, 0, (u32)res * (u32)res * 4);
-
-    enc.endCopyPass(copy_enc);
-  }
-
-  enc.endEncoding();
-
-  gpu->submit(main_queue_, enc);
-  gpu->waitUntilReady(main_queue_);
-
-  {
-    uint8_t *readback_ptr1 = (uint8_t *)gpu->beginReadback(readback);
-    uint8_t *readback_ptr2 = readback_ptr1 + (u32)res * (u32)res * 4;
-
-    for (i32 y = 0; y < res; y++) {
-      for (i32 x = 0; x < res; x++) {
-        EXPECT_EQ(readback_ptr1[0], 255);
-        EXPECT_EQ(readback_ptr1[1], 255);
-        EXPECT_EQ(readback_ptr1[2], 0);
-        EXPECT_EQ(readback_ptr1[3], 255);
-
-        EXPECT_EQ(readback_ptr2[0], 255);
-        EXPECT_EQ(readback_ptr2[1], 0);
-        EXPECT_EQ(readback_ptr2[2], 255);
-        EXPECT_EQ(readback_ptr2[3], 255);
-
-        readback_ptr1 += 4;
-        readback_ptr2 += 4;
-      }
+      raster_enc.setShader(shader_);
+      raster_enc.drawData(Vector3 { 1, 1, 0 });
+      u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
+      EXPECT_EQ(post_draw_data - base, 512);
+      raster_enc.draw(0, 1);
+      enc.endRasterPass(raster_enc);
     }
 
-    gpu->endReadback(readback);
+    {
+      RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
+      raster_enc.setShader(shader_);
+      u8 *new_pass_data = raster_enc.tmpBuffer(1).ptr;
+      EXPECT_EQ(new_pass_data - base, 768);
+      raster_enc.drawData(Vector3 { 1, 0, 1 });
+      u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
+      EXPECT_EQ(post_draw_data - base, 1280);
+      raster_enc.draw(0, 1);
+      enc.endRasterPass(raster_enc);
+    }
+
+    {
+      CopyPassEncoder copy_enc = enc.beginCopyPass();
+
+      copy_enc.copyTextureToBuffer(
+          attachment0, readback, 0, 0);
+
+      copy_enc.copyTextureToBuffer(
+          attachment1, readback, 0, (u32)res * (u32)res * 4);
+
+      enc.endCopyPass(copy_enc);
+    }
+
+    enc.endEncoding();
+
+    gpu->submit(main_queue_, enc);
+    gpu->waitUntilReady(main_queue_);
+
+    {
+      uint8_t *readback_ptr1 = (uint8_t *)gpu->beginReadback(readback);
+      uint8_t *readback_ptr2 = readback_ptr1 + (u32)res * (u32)res * 4;
+
+      for (i32 y = 0; y < res; y++) {
+        for (i32 x = 0; x < res; x++) {
+          EXPECT_EQ(readback_ptr1[0], 255);
+          EXPECT_EQ(readback_ptr1[1], 255);
+          EXPECT_EQ(readback_ptr1[2], 0);
+          EXPECT_EQ(readback_ptr1[3], 255);
+
+          EXPECT_EQ(readback_ptr2[0], 255);
+          EXPECT_EQ(readback_ptr2[1], 0);
+          EXPECT_EQ(readback_ptr2[2], 255);
+          EXPECT_EQ(readback_ptr2[3], 255);
+
+          readback_ptr1 += 4;
+          readback_ptr2 += 4;
+        }
+      }
+
+      gpu->endReadback(readback);
+    }
   }
 
   gpuAPI->processGraphicsEvents();

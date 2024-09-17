@@ -9,10 +9,12 @@ namespace {
 struct ImGuiBackend {
   WindowManager *wm;
 
-  Sampler bilinearSampler;
   ParamBlockType paramBlockType;
   RasterPassInterface rasterPassInterface;
   RasterShader shader;
+  Sampler fontSampler;
+  Texture fontsTexture;
+  ParamBlock fontsParamBlock;
 };
 
 RasterShader loadShader(GPURuntime *gpu,
@@ -52,12 +54,49 @@ RasterShader loadShader(GPURuntime *gpu,
   });
 }
 
+void loadFonts(GPURuntime *gpu,
+               GPUQueue tx_queue)
+{
+  ImGuiIO &io = ImGui::GetIO();
+  auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+
+  u8 *atlas_pixels;
+  int atlas_width, atlas_height;
+  io.Fonts->GetTexDataAsRGBA32(&atlas_pixels, &atlas_width, &atlas_height);
+
+  bd->fontsTexture = gpu->createTexture({
+    .format = TextureFormat::RGBA8_UNorm,
+    .width = u16(atlas_width),
+    .height = u16(atlas_height),
+    .initData = { .ptr = atlas_pixels },
+  }, tx_queue);
+
+  bd->fontsParamBlock = gpu->createParamBlock({
+    .typeID = bd->paramBlockType,
+    .textures = { bd->fontsTexture },
+    .samplers = { bd->fontSampler },
+  });
+
+  // Store our identifier
+  io.Fonts->SetTexID((ImTextureID)(u64)bd->fontsParamBlock.uint());
+}
+
+void unloadFonts(GPURuntime *gpu)
+{
+  ImGuiIO &io = ImGui::GetIO();
+  auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+
+  gpu->destroyParamBlock(bd->fontsParamBlock);
+  gpu->destroyTexture(bd->fontsTexture);
+}
+
 }
 
 namespace ImGuiSystem {
 
 void init(WindowManager &wm,
           GPURuntime *gpu,
+          GPUQueue tx_queue,
           ShaderCompiler *shaderc,
           TextureFormat attachment_fmt)
 {
@@ -80,12 +119,21 @@ void init(WindowManager &wm,
   io.BackendRendererName = "gas";
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-  bd->wm = &wm;
-  bd->bilinearSampler = gpu->createSampler({
-    .addressMode = Repeat,
-    .anisotropy = 1,
-  });
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  platform_io.Platform_SetClipboardTextFn =
+    [](ImGuiContext *, const char *text)
+  {
+    // Set clipboard text
+    (void)text;
+  };
 
+  platform_io.Platform_GetClipboardTextFn =
+    [](ImGuiContext *)
+  { 
+    return "";
+  };
+
+  bd->wm = &wm;
   bd->paramBlockType = gpu->createParamBlockType({
     .uuid = "imgui_param_block"_to_uuid,
     .textures = {
@@ -103,22 +151,21 @@ void init(WindowManager &wm,
     },
   });
 
-  bd->shader =
-      loadShader(gpu, shaderc, bd->paramBlockType, bd->rasterPassInterface);
+  bd->shader = loadShader(
+      gpu, shaderc, bd->paramBlockType, bd->rasterPassInterface);
 
-  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-  platform_io.Platform_SetClipboardTextFn =
-    [](ImGuiContext *, const char *text)
-  {
-    // Set clipboard text
-    (void)text;
-  };
+  bd->fontSampler = gpu->createSampler({
+    .addressMode = Repeat,
+    .anisotropy = 1,
+  });
 
-  platform_io.Platform_GetClipboardTextFn =
-    [](ImGuiContext *)
-  { 
-    return "";
-  };
+  loadFonts(gpu, tx_queue);
+}
+
+void reloadAssets(GPURuntime *gpu, GPUQueue tx_queue)
+{
+  unloadFonts(gpu);
+  loadFonts(gpu, tx_queue);
 }
 
 void shutdown(GPURuntime *gpu)
@@ -126,10 +173,11 @@ void shutdown(GPURuntime *gpu)
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
 
+  unloadFonts(gpu);
+  gpu->destroySampler(bd->fontSampler);
   gpu->destroyRasterShader(bd->shader);
   gpu->destroyRasterPassInterface(bd->rasterPassInterface);
   gpu->destroyParamBlockType(bd->paramBlockType);
-  gpu->destroySampler(bd->bilinearSampler);
 
   delete bd;
   io.BackendRendererName = nullptr;

@@ -82,13 +82,34 @@ struct BackendRasterShader {
 
 struct NoMetadata {};
 
+static constexpr i32 MAX_GPU_TMP_INPUT_BUFFERS = 16;
+
+struct StagingBelt {
+  static constexpr inline i32 MAX_STAGING_BUFFERS = 64;
+  struct CallbackState {
+    Backend *backend;
+    i32 idx;
+  };
+
+  std::array<wgpu::Buffer, MAX_STAGING_BUFFERS> buffers;
+  std::array<u8 *, MAX_STAGING_BUFFERS> ptrs;
+
+  std::array<CallbackState, MAX_STAGING_BUFFERS> cbStates;
+
+  std::array<i32, MAX_STAGING_BUFFERS> freeList;
+  i32 numFree;
+  i32 numAllocated;
+
+  SpinLock lock;
+};
+
 struct TmpDynamicUniformData {
   static constexpr inline u32 BUFFER_SIZE = 64 * 1024 * 1024;
   static constexpr inline u32 NUM_BLOCKS =
       BUFFER_SIZE / GPUTmpInputBlock::BLOCK_SIZE;
 
   wgpu::BindGroup bindGroup;
-  uint8_t *ptr;
+  i32 stagingBeltIndex;
 };
 
 struct GPUTmpInputState {
@@ -98,12 +119,12 @@ struct GPUTmpInputState {
   u32 bufferHandlesBase;
 
   alignas(MADRONA_CACHE_LINE) u64 curFreeRange;
-
-  SpinLock lock {};
 };
 
 struct BackendQueueData {
   GPUTmpInputState gpuTmpInput[2];
+  SpinLock allocLock {};
+
   i32 curFrame;
   i32 numFrames;
 };
@@ -189,6 +210,7 @@ public:
   wgpu::Instance inst;
   BackendLimits limits;
 
+  StagingBelt stagingBelt {};
   wgpu::BindGroupLayout tmpDynamicUniformLayout;
   std::array<BackendQueueData, 2> queueDatas;
 
@@ -213,6 +235,8 @@ public:
                  wgpu::Instance &inst,
                  BackendLimits &limits,
                  bool errors_are_fatal);
+
+  inline void destroy();
 
   void createGPUResources(i32 num_buffers,
                           const BufferInit *buffer_inits,
@@ -307,6 +331,10 @@ public:
 
   inline wgpu::BindGroupLayout getBindGroupLayoutByParamBlockTypeID(
       ParamBlockTypeID id);
+
+  i32 allocBlockFromStagingBelt();
+  static void returnBlockToStagingBeltCallback(
+    wgpu::MapAsyncStatus async_status, const char *msg, void *user_data);
 
   inline TmpDynamicUniformData allocTmpDynamicUniformData(
       u32 buffer_handle_idx);

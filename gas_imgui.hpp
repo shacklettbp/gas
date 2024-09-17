@@ -8,10 +8,14 @@ namespace ImGuiSystem {
 
 void init(WindowManager &wm,
           GPURuntime *gpu,
+          GPUQueue tx_queue,
           ShaderCompiler *shaderc,
           TextureFormat attachment_fmt);
-void reloadAssets(GPURuntime *gpu);
 void shutdown(GPURuntime *gpu);
+
+void reloadAssets(GPURuntime *gpu,
+                  GPUQueue gpu_queue,
+                  CommandEncoder &enc);
 
 void startFrame(GPURuntime *gpu);
 

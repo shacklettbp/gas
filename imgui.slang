@@ -10,12 +10,12 @@ struct V2F {
   float2 uv    : TexCoord0;
 };
 
-struct TexParams {
+struct FontParams {
   Texture2D atlas;
   SamplerState sampler;
 };
 
-ParameterBlock<TexParams> texParams;
+ParameterBlock<FontParams> fontParams;
 
 [shader("vertex")]
 V2F vertMain(VertInput v)
@@ -32,5 +32,5 @@ V2F vertMain(VertInput v)
 [shader("fragment")]
 float4 fragMain(V2F v2f) : SV_Target0
 {
-  return v2f.color * texParams.atlas.Sample(texParams.sampler, v2f.uv);
+  return v2f.color * fontParams.atlas.Sample(fontParams.sampler, v2f.uv);
 }

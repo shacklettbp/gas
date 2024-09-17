@@ -59,7 +59,8 @@ int main(int argc, char *argv[])
   Swapchain swapchain = gpu->createSwapchain(
       window->surface, &swapchain_properties);
 
-  ImGuiSystem::init(wm, gpu, shaderc, swapchain_properties.format);
+  GPUQueue main_queue = gpu->getMainQueue();
+  ImGuiSystem::init(wm, gpu, main_queue, shaderc, swapchain_properties.format);
 
   shaderc_lib.destroyCompiler(shaderc);
 
@@ -116,7 +117,6 @@ int main(int argc, char *argv[])
 
   u32 frame_num = 0;
 
-  GPUQueue main_queue = gpu->getMainQueue();
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   while (true) {
     {
