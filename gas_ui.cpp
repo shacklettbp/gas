@@ -262,6 +262,11 @@ static void initWindow(PlatformWindow *window_out,
   window_out->pixelHeight = starting_pixel_height;
   window_out->systemUIScale = 2.f; // FIXME 
 
+  // FIXME
+  window_out->mousePos = { -FLT_MAX, -FLT_MAX };
+  window_out->leftMousePressed = false;
+  window_out->rightMousePressed = false;
+
   window_out->shouldClose = false;
   window_out->surface = surface;
   window_out->os = os;
@@ -379,6 +384,19 @@ bool UISystem::processEvents()
       }
     }
   } while (num_events == events.size());
+
+  // FIXME:
+  {
+    float mouse_x, mouse_y;
+    u32 button_mask = SDL_GetMouseState(&mouse_x, &mouse_y);
+
+    impl_->mainWindow.mousePos = { mouse_x, mouse_y };
+    impl_->mainWindow.leftMousePressed =
+        (button_mask & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+    impl_->mainWindow.rightMousePressed =
+        (button_mask & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
+  }
+
 #endif
 
   return should_quit;

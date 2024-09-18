@@ -204,6 +204,8 @@ void reloadFonts(GPURuntime *gpu,
 
 void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
 {
+  float pixels_to_ui = 1.f / ui_scale;
+
   Window *window = ui_sys.getMainWindow();
 
   ImGuiIO &io = ImGui::GetIO();
@@ -211,11 +213,20 @@ void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
   bd->fbWidth = window->pixelWidth;
   bd->fbHeight = window->pixelHeight;
 
-  io.DisplaySize = ImVec2(window->pixelWidth / ui_scale,
-                          window->pixelHeight / ui_scale);
+  io.DisplaySize = ImVec2(window->pixelWidth * pixels_to_ui,
+                          window->pixelHeight * pixels_to_ui);
   io.DisplayFramebufferScale = ImVec2(ui_scale, ui_scale);
 
   io.DeltaTime = delta_t;
+
+  io.AddMousePosEvent(
+      window->mousePos.x * pixels_to_ui,
+      window->mousePos.y * pixels_to_ui);
+  io.AddMouseButtonEvent(0, window->leftMousePressed);
+  io.AddMouseButtonEvent(1, window->rightMousePressed);
+  
+  // FIXME
+  //io.AddFocusEvent(true);
 
   ImGui::NewFrame();
 }
@@ -266,12 +277,12 @@ void render(RasterPassEncoder &enc)
   { // Setup VertexTransform Dynamic Uniform
     Vector2 vert_scale {
       2.f / draw_data->DisplaySize.x,
-      2.f / draw_data->DisplaySize.y,
+      -2.f / draw_data->DisplaySize.y,
     };
 
     Vector2 vert_translation {
       -1.f - clip_offset.x * vert_scale.x,
-      -1.f - clip_offset.y * vert_scale.y,
+      1.f + clip_offset.y * vert_scale.y,
     };
 
     enc.drawData(VertexTransform { vert_scale, vert_translation });

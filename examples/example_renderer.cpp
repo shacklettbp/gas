@@ -7,6 +7,7 @@ namespace {
 void buildUI()
 {
   ImGui::Begin("ImGui Window");
+  ImGui::Text("Hi");
   ImGui::End();
 }
 
@@ -143,8 +144,9 @@ int main(int argc, char *argv[])
       if (should_exit || window->shouldClose) {
         break;
       }
-      ImGuiSystem::newFrame(ui_sys, window->systemUIScale, 1.f / 60.f);
     }
+
+    ImGuiSystem::newFrame(ui_sys, window->systemUIScale, 1.f / 60.f);
 
     buildUI();
 

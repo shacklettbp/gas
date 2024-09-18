@@ -13,7 +13,14 @@ struct Window {
   i32 pixelWidth;
   i32 pixelHeight;
   f32 systemUIScale;
+
+  // FIXME
+  Vector2 mousePos;
+  bool leftMousePressed;
+  bool rightMousePressed;
+
   bool shouldClose;
+
   Surface surface;
 };
 
