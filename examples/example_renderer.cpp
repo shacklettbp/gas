@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
   });
 
   ImGuiSystem::init(ui_sys, gpu, main_queue, shaderc, imgui_pass_interface,
-      GAS_EXAMPLES_DIR "imgui_font.ttf", 16.f);
+      GAS_EXAMPLES_DIR "imgui_font.ttf", 12.f);
 
   RasterPass imgui_pass = gpu->createRasterPass({
     .interface = imgui_pass_interface,

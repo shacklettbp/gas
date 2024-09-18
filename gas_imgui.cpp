@@ -68,13 +68,16 @@ void loadFonts(GPURuntime *gpu,
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
 
-  float scale_factor = 2.f;
+  // FIXME: make this an input
+  float ui_scale = 2.f;
 
-  float scaled_font_size = font_size * scale_factor;
-  io.Fonts->AddFontFromFileTTF(font_path, scaled_font_size);
+  io.Fonts->Clear();
+  ImFontConfig font_cfg;
+  font_cfg.RasterizerDensity = ui_scale;
+  auto font = io.Fonts->AddFontFromFileTTF(font_path, font_size, &font_cfg);
 
   //auto &style = ImGui::GetStyle();
-  //style.ScaleAllSizes(scale_factor);
+  //style.ScaleAllSizes(1.f);
 
   u8 *atlas_pixels;
   int atlas_width, atlas_height;

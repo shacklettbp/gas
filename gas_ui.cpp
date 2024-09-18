@@ -390,6 +390,11 @@ bool UISystem::processEvents()
     float mouse_x, mouse_y;
     u32 button_mask = SDL_GetMouseState(&mouse_x, &mouse_y);
 
+#if defined(SDL_PLATFORM_MACOS)
+    mouse_x *= 2;
+    mouse_y *= 2;
+#endif
+
     impl_->mainWindow.mousePos = { mouse_x, mouse_y };
     impl_->mainWindow.leftMousePressed =
         (button_mask & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
