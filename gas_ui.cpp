@@ -48,7 +48,7 @@ struct PlatformWindow : public Window {
 
 }
 
-struct UISystem::Impl {
+struct UIBackend : public UISystem {
   GPULib *gpuLib;
   GPUAPI *gpuAPI;
 
@@ -56,6 +56,23 @@ struct UISystem::Impl {
 #ifdef GAS_USE_SDL
   SDL_WindowID mainWindowID;
 #endif
+
+  UserInput userInput;
+
+  inline void shutdown();
+
+  inline Window * createWindow(const char *title,
+                               i32 starting_pixel_width,
+                               i32 starting_pixel_height);
+
+  inline Window * createMainWindow(const char *title,
+                                   i32 starting_pixel_width,
+                                   i32 starting_pixel_height);
+
+  inline void destroyWindow(Window *window);
+  inline void destroyMainWindow();
+
+  inline bool processEvents();
 };
 
 #ifdef GAS_USE_SDL
@@ -91,27 +108,23 @@ static inline T *checkSDLPointer(T *ptr, const char *msg)
 #define REQ_SDL_PTR(expr) checkSDLPointer((expr), #expr)
 #endif
 
-static void initUISystemAPI()
+static void initUIBackendAPI()
 {
 #ifdef GAS_USE_SDL
   REQ_SDL(SDL_Init(SDL_INIT_GAMEPAD | SDL_INIT_VIDEO));
 #endif
 }
 
-static void cleanupUISystemAPI()
+static void cleanupUIBackendAPI()
 {
 #ifdef GAS_USE_SDL
   SDL_Quit();
 #endif
 }
 
-UISystem::UISystem(Impl *impl)
-  : impl_(impl)
-{}
-
-UISystem UISystem::init(const Config &cfg)
+UISystem * UISystem::init(const Config &cfg)
 {
-  initUISystemAPI();
+  initUIBackendAPI();
 
   GPUAPISelect api_select;
   if (!cfg.desiredGPUAPI.has_value()) {
@@ -132,24 +145,25 @@ UISystem UISystem::init(const Config &cfg)
     .apiExtensions = api_exts,
   });
 
-  return UISystem(new Impl {
+  return new UIBackend {
     .gpuLib = gpu_lib,
     .gpuAPI = gpu_api,
     .mainWindow = {},
 #ifdef GAS_USE_SDL
     .mainWindowID = {},
 #endif
-  });
+    .userInput = {},
+  };
 }
 
-void UISystem::shutdown()
+void UIBackend::shutdown()
 {
-  impl_->gpuAPI->shutdown();
-  InitSystem::unloadAPILib(impl_->gpuLib);
+  gpuAPI->shutdown();
+  InitSystem::unloadAPILib(gpuLib);
 
-  delete impl_;
+  delete this;
 
-  cleanupUISystemAPI();
+  cleanupUIBackendAPI();
 }
 
 static void initWindow(PlatformWindow *window_out,
@@ -262,12 +276,8 @@ static void initWindow(PlatformWindow *window_out,
   window_out->pixelHeight = starting_pixel_height;
   window_out->systemUIScale = 2.f; // FIXME 
 
-  // FIXME
-  window_out->mousePos = { -FLT_MAX, -FLT_MAX };
-  window_out->leftMousePressed = false;
-  window_out->rightMousePressed = false;
+  window_out->state = WindowState::IsFocused;
 
-  window_out->shouldClose = false;
   window_out->surface = surface;
   window_out->os = os;
 }
@@ -287,71 +297,144 @@ static void cleanupWindow(PlatformWindow *window,
 #endif
 }
 
-Window * UISystem::createWindow(const char *title,
+Window * UIBackend::createWindow(const char *title,
                                 i32 starting_pixel_width,
                                 i32 starting_pixel_height)
 {
   PlatformWindow *window = new PlatformWindow {};
 
-  initWindow(window, impl_->gpuAPI, title,
+  initWindow(window, gpuAPI, title,
              starting_pixel_width, starting_pixel_height);
 
   return window;
 }
 
-Window * UISystem::createMainWindow(const char *title,
+Window * UIBackend::createMainWindow(const char *title,
                                     i32 starting_pixel_width,
                                     i32 starting_pixel_height)
 {
-  initWindow(&impl_->mainWindow, impl_->gpuAPI, title,
+  initWindow(&mainWindow, gpuAPI, title,
              starting_pixel_width, starting_pixel_height);
 
 #ifdef GAS_USE_SDL
-  impl_->mainWindowID = SDL_GetWindowID(impl_->mainWindow.os.sdl);
+  mainWindowID = SDL_GetWindowID(mainWindow.os.sdl);
 #endif
 
-  return &impl_->mainWindow;
+  return &mainWindow;
 }
 
-void UISystem::destroyWindow(Window *window)
+void UIBackend::destroyWindow(Window *window)
 {
   auto plat_window = static_cast<PlatformWindow *>(window);
-  cleanupWindow(plat_window, impl_->gpuAPI);
+  cleanupWindow(plat_window, gpuAPI);
   delete plat_window;
 }
 
-void UISystem::destroyMainWindow()
+void UIBackend::destroyMainWindow()
 {
-  cleanupWindow(&impl_->mainWindow, impl_->gpuAPI);
+  cleanupWindow(&mainWindow, gpuAPI);
 }
 
-Window * UISystem::getMainWindow()
-{
-  return &impl_->mainWindow;
-}
-
-bool UISystem::processEvents()
+bool UIBackend::processEvents()
 {
   bool should_quit = false;
+
+  userInput.double_clicks_ = 0;
+  utils::zeroN<u8>(userInput.events_.data(), userInput.events_.size());
+
+  auto updateInputEvent =
+    [this]
+  (InputID id, bool down)
+  {
+    i32 event_idx = (i32)id / 4;
+    i32 event_bit = (i32)id % 4;
+
+    if (down) {
+      userInput.events_[event_idx] |= (1 << (2 * event_bit));
+    } else {
+      userInput.events_[event_idx] |= (1 << (2 * event_bit + 1));
+    }
+  };
+
+  auto updateInputState =
+    [this]
+  (InputID id, bool down)
+  {
+    i32 state_idx = (i32)id / 8;
+    i32 state_bit = (i32)id % 8;
+
+    if (down) {
+      userInput.states_[state_idx] |= (1 << state_bit);
+    } else {
+      userInput.states_[state_idx] &= ~(1 << state_bit);
+    }
+  };
 
 #ifdef GAS_USE_SDL
   auto getPlatformWindow =
     [this]
   (SDL_WindowID window_id) -> PlatformWindow *
   {
-    PlatformWindow *window;
-    if (window_id == impl_->mainWindowID) [[likely]] {
-      window = &impl_->mainWindow;
+    if (window_id == mainWindowID) [[likely]] {
+      return &mainWindow;
+    } else if (window_id == 0) {
+      return nullptr;
     } else {
       SDL_Window *sdl_hdl = REQ_SDL_PTR(SDL_GetWindowFromID(window_id));
       SDL_PropertiesID window_props =
         REQ_SDL_PROP(SDL_GetWindowProperties(sdl_hdl));
 
-      window = (PlatformWindow *)REQ_SDL_PTR(SDL_GetPointerProperty(
+      return (PlatformWindow *)REQ_SDL_PTR(SDL_GetPointerProperty(
         window_props, "gas_hdl", nullptr));
     }
+  };
 
-    return window;
+  auto keyToInputID =
+    []
+  (SDL_Keycode key) -> InputID
+  {
+    switch (key) {
+      default:          return InputID::NUM_IDS;
+      case SDLK_A:      return InputID::A;
+      case SDLK_B:      return InputID::B;
+      case SDLK_C:      return InputID::C;
+      case SDLK_D:      return InputID::D;
+      case SDLK_E:      return InputID::E;
+      case SDLK_F:      return InputID::F;
+      case SDLK_G:      return InputID::G;
+      case SDLK_H:      return InputID::H;
+      case SDLK_I:      return InputID::I;
+      case SDLK_J:      return InputID::J;
+      case SDLK_K:      return InputID::K;
+      case SDLK_L:      return InputID::L;
+      case SDLK_M:      return InputID::M;
+      case SDLK_N:      return InputID::N;
+      case SDLK_O:      return InputID::O;
+      case SDLK_P:      return InputID::P;
+      case SDLK_Q:      return InputID::Q;
+      case SDLK_R:      return InputID::S;
+      case SDLK_S:      return InputID::S;
+      case SDLK_T:      return InputID::T;
+      case SDLK_U:      return InputID::U;
+      case SDLK_V:      return InputID::V;
+      case SDLK_W:      return InputID::W;
+      case SDLK_X:      return InputID::X;
+      case SDLK_Y:      return InputID::Y;
+      case SDLK_Z:      return InputID::Z;
+      case SDLK_0:      return InputID::K0;
+      case SDLK_1:      return InputID::K1;
+      case SDLK_2:      return InputID::K2;
+      case SDLK_3:      return InputID::K3;
+      case SDLK_4:      return InputID::K4;
+      case SDLK_5:      return InputID::K5;
+      case SDLK_6:      return InputID::K6;
+      case SDLK_7:      return InputID::K7;
+      case SDLK_8:      return InputID::K8;
+      case SDLK_9:      return InputID::K9;
+      case SDLK_SPACE:  return InputID::Space;
+      case SDLK_LSHIFT: return InputID::Shift;
+      case SDLK_RSHIFT: return InputID::Shift;
+    }
   };
 
   static std::array<SDL_Event, 1024> events;
@@ -368,48 +451,140 @@ bool UISystem::processEvents()
     }
 
     for (int i = 0; i < num_events; i++) {
-      SDL_Event &event = events[i];
+      SDL_Event &e = events[i];
 
-      switch (event.type) {
-      default: break;
-      case SDL_EVENT_QUIT: {
-        should_quit = true;
-      } break;
-      case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
-        SDL_WindowID window_id = event.window.windowID;
+      switch (e.type) {
+        default: break;
+        case SDL_EVENT_QUIT: {
+          should_quit = true;
+        } break;
+        case SDL_EVENT_MOUSE_MOTION: {
+          PlatformWindow *window = getPlatformWindow(e.motion.windowID);
+          if (!window) {
+            break;
+          }
 
-        PlatformWindow *window = getPlatformWindow(window_id);
-        window->shouldClose = true;
-      } break;
+          userInput.mouse_pos_ = { e.motion.x, e.motion.y };
+        } break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+          InputID id = InputID((u32)InputID::MouseLeft + e.button.button);
+          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputEvent(id, true);
+
+          if (e.button.clicks > 1) {
+            userInput.double_clicks_ |= 1 << (i32)id;
+          }
+        } break;
+        case SDL_EVENT_MOUSE_BUTTON_UP: {
+          InputID id = InputID((u32)InputID::MouseLeft + e.button.button);
+          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputEvent(id, false);
+        } break;
+        case SDL_EVENT_KEY_DOWN: {
+          InputID id = keyToInputID(e.key.key);
+          if (id == InputID::NUM_IDS) {
+            break;
+          }
+          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputEvent(id, false);
+        } break;
+        case SDL_EVENT_KEY_UP: {
+          InputID id = keyToInputID(e.key.key);
+          if (id == InputID::NUM_IDS) {
+            break;
+          }
+          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputEvent(id, true);
+        } break;
+        case SDL_EVENT_WINDOW_FOCUS_GAINED: {
+          PlatformWindow *window = getPlatformWindow(e.motion.windowID);
+          if (!window) {
+            break;
+          }
+
+          window->state |= WindowState::IsFocused;
+        } break;
+        case SDL_EVENT_WINDOW_FOCUS_LOST: {
+          PlatformWindow *window = getPlatformWindow(e.motion.windowID);
+          if (!window) {
+            break;
+          }
+
+          window->state &= WindowState(~(u32)WindowState::IsFocused);
+        } break;
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
+          PlatformWindow *window = getPlatformWindow(e.window.windowID);
+          if (!window) {
+            break;
+          }
+
+          window->state |= WindowState::ShouldClose;
+        } break;
       }
     }
   } while (num_events == events.size());
 
-  // FIXME:
-  {
-    float mouse_x, mouse_y;
-    u32 button_mask = SDL_GetMouseState(&mouse_x, &mouse_y);
-
-#if defined(SDL_PLATFORM_MACOS)
-    mouse_x *= 2;
-    mouse_y *= 2;
+#ifdef SDL_PLATFORM_MACOS
+  // macOS reports mouse in half pixel coords for hidpi displays
+  userInput.mouse_pos_ *= 2.f;
 #endif
-
-    impl_->mainWindow.mousePos = { mouse_x, mouse_y };
-    impl_->mainWindow.leftMousePressed =
-        (button_mask & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
-    impl_->mainWindow.rightMousePressed =
-        (button_mask & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
-  }
 
 #endif
 
   return should_quit;
 }
 
+static inline UIBackend * backend(UISystem *base)
+{
+  return static_cast<UIBackend *>(base);
+}
+
+void UISystem::shutdown() { backend(this)->shutdown(); }
+
+Window * UISystem::createWindow(const char *title,
+                                i32 starting_pixel_width,
+                                i32 starting_pixel_height)
+{
+  return backend(this)->createWindow(
+      title, starting_pixel_width, starting_pixel_height);
+}
+
+Window * UISystem::createMainWindow(const char *title,
+                                    i32 starting_pixel_width,
+                                    i32 starting_pixel_height)
+{
+  return backend(this)->createMainWindow(
+      title, starting_pixel_width, starting_pixel_height);
+}
+
+void UISystem::destroyWindow(Window *window)
+{
+  return backend(this)->destroyWindow(window);
+}
+
+void UISystem::destroyMainWindow()
+{
+  return backend(this)->destroyMainWindow();
+}
+
+Window * UISystem::getMainWindow()
+{
+  return &backend(this)->mainWindow;
+}
+
+bool UISystem::processEvents()
+{
+  return backend(this)->processEvents();
+}
+
+UserInput & UISystem::inputState()
+{
+  return backend(this)->userInput;
+}
+
 GPUAPI * UISystem::gpuAPI()
 {
-  return impl_->gpuAPI;
+  return backend(this)->gpuAPI;
 }
 
 }

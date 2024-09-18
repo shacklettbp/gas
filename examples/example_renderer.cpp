@@ -16,23 +16,22 @@ void buildUI()
 int main(int argc, char *argv[])
 {
   using namespace gas;
-  using namespace gas;
 
-  UISystem ui_sys = UISystem::init(UISystem::Config {
+  UISystem *ui_sys = UISystem::init(UISystem::Config {
     .enableValidation = true,
     .runtimeErrorsAreFatal = true,
   });
 
   {
-    bool should_exit = ui_sys.processEvents();
+    bool should_exit = ui_sys->processEvents();
     if (should_exit) {
       return 0;
     }
   }
 
-  GPUAPI *gpu_api = ui_sys.gpuAPI();
+  GPUAPI *gpu_api = ui_sys->gpuAPI();
 
-  Window *window = ui_sys.createMainWindow("GAS Example", 1920, 1080);
+  Window *window = ui_sys->createMainWindow("GAS Example", 1920, 1080);
   
   ShaderCompilerLib shaderc_lib = InitSystem::loadShaderCompiler();
   auto backend_bytecode_type = gpu_api->backendShaderByteCodeType();
@@ -140,8 +139,9 @@ int main(int argc, char *argv[])
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   while (true) {
     {
-      bool should_exit = ui_sys.processEvents();
-      if (should_exit || window->shouldClose) {
+      bool should_exit = ui_sys->processEvents();
+      if (should_exit ||
+          (window->state & WindowState::ShouldClose) != WindowState::None) {
         break;
       }
     }
@@ -217,6 +217,6 @@ int main(int argc, char *argv[])
 
   InitSystem::unloadShaderCompiler(shaderc_lib);
 
-  ui_sys.destroyMainWindow();
-  ui_sys.shutdown();
+  ui_sys->destroyMainWindow();
+  ui_sys->shutdown();
 }

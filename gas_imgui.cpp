@@ -119,7 +119,7 @@ void unloadFonts(GPURuntime *gpu)
 
 namespace ImGuiSystem {
 
-void init(UISystem &ui_sys,
+void init(UISystem *ui_sys,
           GPURuntime *gpu,
           GPUQueue tx_queue,
           ShaderCompiler *shaderc,
@@ -205,11 +205,12 @@ void reloadFonts(GPURuntime *gpu,
   loadFonts(gpu, tx_queue, font_path, font_size);
 }
 
-void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
+void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
 {
   float pixels_to_ui = 1.f / ui_scale;
 
-  Window *window = ui_sys.getMainWindow();
+  UserInput &input = ui_sys->inputState();
+  Window *window = ui_sys->getMainWindow();
 
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
@@ -222,14 +223,15 @@ void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
 
   io.DeltaTime = delta_t;
 
-  io.AddMousePosEvent(
-      window->mousePos.x * pixels_to_ui,
-      window->mousePos.y * pixels_to_ui);
-  io.AddMouseButtonEvent(0, window->leftMousePressed);
-  io.AddMouseButtonEvent(1, window->rightMousePressed);
+  Vector2 mouse_pos = input.mousePosition();
+
+  io.AddMousePosEvent(mouse_pos.x * pixels_to_ui,
+                      mouse_pos.y * pixels_to_ui);
+  io.AddMouseButtonEvent(0, input.isDown(InputID::MouseLeft));
+  io.AddMouseButtonEvent(1, input.isDown(InputID::MouseRight));
   
-  // FIXME
-  //io.AddFocusEvent(true);
+  io.AddFocusEvent((window->state & WindowState::IsFocused) != 
+                   WindowState::None);
 
   ImGui::NewFrame();
 }
