@@ -7,12 +7,12 @@ TEST(UI, ManySwapchains)
   using namespace gas;
   using namespace gas;
 
-  WindowManager wm = WindowManager::init(WindowManager::Config {
+  UISystem ui_sys = UISystem::init(UISystem::Config {
     .enableValidation = true,
   });
 
-  auto processEvents = [&wm]() {
-    bool should_exit = wm.processEvents();
+  auto processEvents = [&ui_sys]() {
+    bool should_exit = ui_sys.processEvents();
     EXPECT_FALSE(should_exit);
     if (should_exit) {
       return;
@@ -21,14 +21,14 @@ TEST(UI, ManySwapchains)
 
   processEvents();
 
-  GPUAPI *gpu_api = wm.gpuAPI();
+  GPUAPI *gpu_api = ui_sys.gpuAPI();
 
   constexpr i32 num_windows = 32;
   Window * windows[num_windows];
   Swapchain swapchains[num_windows];
 
   for (i32 i = 0; i < num_windows; i++) {
-    windows[i] = wm.createWindow("Labyrinth", 64, 64);
+    windows[i] = ui_sys.createWindow("Labyrinth", 64, 64);
   }
 
   processEvents();
@@ -61,8 +61,8 @@ TEST(UI, ManySwapchains)
   processEvents();
 
   for (i32 i = 0; i < num_windows; i++) {
-    wm.destroyWindow(windows[i]);
+    ui_sys.destroyWindow(windows[i]);
   }
 
-  wm.shutdown();
+  ui_sys.shutdown();
 }

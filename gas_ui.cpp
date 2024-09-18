@@ -48,7 +48,7 @@ struct PlatformWindow : public Window {
 
 }
 
-struct WindowManager::Impl {
+struct UISystem::Impl {
   GPULib *gpuLib;
   GPUAPI *gpuAPI;
 
@@ -91,27 +91,27 @@ static inline T *checkSDLPointer(T *ptr, const char *msg)
 #define REQ_SDL_PTR(expr) checkSDLPointer((expr), #expr)
 #endif
 
-static void initWindowManagerAPI()
+static void initUISystemAPI()
 {
 #ifdef GAS_USE_SDL
   REQ_SDL(SDL_Init(SDL_INIT_GAMEPAD | SDL_INIT_VIDEO));
 #endif
 }
 
-static void cleanupWindowManagerAPI()
+static void cleanupUISystemAPI()
 {
 #ifdef GAS_USE_SDL
   SDL_Quit();
 #endif
 }
 
-WindowManager::WindowManager(Impl *impl)
+UISystem::UISystem(Impl *impl)
   : impl_(impl)
 {}
 
-WindowManager WindowManager::init(const Config &cfg)
+UISystem UISystem::init(const Config &cfg)
 {
-  initWindowManagerAPI();
+  initUISystemAPI();
 
   GPUAPISelect api_select;
   if (!cfg.desiredGPUAPI.has_value()) {
@@ -132,7 +132,7 @@ WindowManager WindowManager::init(const Config &cfg)
     .apiExtensions = api_exts,
   });
 
-  return WindowManager(new Impl {
+  return UISystem(new Impl {
     .gpuLib = gpu_lib,
     .gpuAPI = gpu_api,
     .mainWindow = {},
@@ -142,29 +142,32 @@ WindowManager WindowManager::init(const Config &cfg)
   });
 }
 
-void WindowManager::shutdown()
+void UISystem::shutdown()
 {
   impl_->gpuAPI->shutdown();
   InitSystem::unloadAPILib(impl_->gpuLib);
 
   delete impl_;
 
-  cleanupWindowManagerAPI();
+  cleanupUISystemAPI();
 }
 
 static void initWindow(PlatformWindow *window_out,
                        GPUAPI *gpu_api,
                        const char *title,
-                       i32 width,
-                       i32 height)
+                       i32 starting_pixel_width,
+                       i32 starting_pixel_height)
 {
 #ifdef GAS_USE_SDL
-#if defined(SDL_PLATFORM_MACOS)
-  assert(width % 2 == 0);
-  assert(height % 2 == 0);
+  i32 os_width = starting_pixel_width;
+  i32 os_height = starting_pixel_height;
 
-  width = width / 2;
-  height = height / 2;
+#if defined(SDL_PLATFORM_MACOS)
+  assert(os_width % 2 == 0);
+  assert(os_height % 2 == 0);
+
+  os_width = os_width / 2;
+  os_height = os_height / 2;
 #endif
 
   SDL_WindowFlags window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
@@ -178,13 +181,14 @@ static void initWindow(PlatformWindow *window_out,
   WindowOSData os;
 
   SDL_Window *sdl_hdl = REQ_SDL_PTR(
-    SDL_CreateWindow(title, width, height, window_flags));
+    SDL_CreateWindow(title, os_width, os_height, window_flags));
 
   os.sdl = sdl_hdl;
 
   SDL_PropertiesID window_props =
     REQ_SDL_PROP(SDL_GetWindowProperties(sdl_hdl));
   
+  void *os_hdl_ptr;
 #if defined(SDL_PLATFORM_LINUX)
   LinuxWindowHandle linux_hdl;
 
@@ -220,15 +224,14 @@ static void initWindow(PlatformWindow *window_out,
     FATAL("Unknown SDL video driver on linux");
   }
 
-  Surface surface = gpu_api->createSurface(&linux_hdl, width, height);
+  os_hdl_ptr = &linux_hdl;
 #elif defined(SDL_PLATFORM_MACOS)
   SDL_MetalView metal_view = REQ_SDL_PTR(SDL_Metal_CreateView(sdl_hdl));
   os.metalView = metal_view;
 
   void *ca_layer = REQ_SDL_PTR(SDL_Metal_GetLayer(metal_view));
 
-  Surface surface =
-    gpu_api->createSurface(ca_layer, width * 2, height * 2);
+  os_hdl_ptr = ca_layer;
 #elif defined(SDL_PLATFORM_WIN32)
   void *hinstance = SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_hdl),
       SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, NULL);
@@ -243,8 +246,7 @@ static void initWindow(PlatformWindow *window_out,
     .hwnd = hwnd,
   };
 
-  Surface surface =
-    gpu_api->createSurface(&win32_hdl, width, height);
+  os_hdl_ptr = &win32_hdl;
 #else
   static_assert(false, "Unimplemented");
 #endif
@@ -253,8 +255,13 @@ static void initWindow(PlatformWindow *window_out,
 
 #endif
 
-  window_out->width = width;
-  window_out->height = height;
+  Surface surface = gpu_api->createSurface(
+      os_hdl_ptr, starting_pixel_width, starting_pixel_height);
+
+  window_out->pixelWidth = starting_pixel_width;
+  window_out->pixelHeight = starting_pixel_height;
+  window_out->systemUIScale = 2.f; // FIXME 
+
   window_out->shouldClose = false;
   window_out->surface = surface;
   window_out->os = os;
@@ -275,22 +282,24 @@ static void cleanupWindow(PlatformWindow *window,
 #endif
 }
 
-Window * WindowManager::createWindow(const char *title,
-                                     i32 width,
-                                     i32 height)
+Window * UISystem::createWindow(const char *title,
+                                i32 starting_pixel_width,
+                                i32 starting_pixel_height)
 {
   PlatformWindow *window = new PlatformWindow {};
 
-  initWindow(window, impl_->gpuAPI, title, width, height);
+  initWindow(window, impl_->gpuAPI, title,
+             starting_pixel_width, starting_pixel_height);
 
   return window;
 }
 
-Window * WindowManager::createMainWindow(const char *title,
-                                         i32 width,
-                                         i32 height)
+Window * UISystem::createMainWindow(const char *title,
+                                    i32 starting_pixel_width,
+                                    i32 starting_pixel_height)
 {
-  initWindow(&impl_->mainWindow, impl_->gpuAPI, title, width, height);
+  initWindow(&impl_->mainWindow, impl_->gpuAPI, title,
+             starting_pixel_width, starting_pixel_height);
 
 #ifdef GAS_USE_SDL
   impl_->mainWindowID = SDL_GetWindowID(impl_->mainWindow.os.sdl);
@@ -299,23 +308,47 @@ Window * WindowManager::createMainWindow(const char *title,
   return &impl_->mainWindow;
 }
 
-void WindowManager::destroyWindow(Window *window)
+void UISystem::destroyWindow(Window *window)
 {
   auto plat_window = static_cast<PlatformWindow *>(window);
   cleanupWindow(plat_window, impl_->gpuAPI);
   delete plat_window;
 }
 
-void WindowManager::destroyMainWindow()
+void UISystem::destroyMainWindow()
 {
   cleanupWindow(&impl_->mainWindow, impl_->gpuAPI);
 }
 
-bool WindowManager::processEvents()
+Window * UISystem::getMainWindow()
+{
+  return &impl_->mainWindow;
+}
+
+bool UISystem::processEvents()
 {
   bool should_quit = false;
 
 #ifdef GAS_USE_SDL
+  auto getPlatformWindow =
+    [this]
+  (SDL_WindowID window_id) -> PlatformWindow *
+  {
+    PlatformWindow *window;
+    if (window_id == impl_->mainWindowID) [[likely]] {
+      window = &impl_->mainWindow;
+    } else {
+      SDL_Window *sdl_hdl = REQ_SDL_PTR(SDL_GetWindowFromID(window_id));
+      SDL_PropertiesID window_props =
+        REQ_SDL_PROP(SDL_GetWindowProperties(sdl_hdl));
+
+      window = (PlatformWindow *)REQ_SDL_PTR(SDL_GetPointerProperty(
+        window_props, "gas_hdl", nullptr));
+    }
+
+    return window;
+  };
+
   static std::array<SDL_Event, 1024> events;
 
   SDL_PumpEvents();
@@ -340,18 +373,7 @@ bool WindowManager::processEvents()
       case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
         SDL_WindowID window_id = event.window.windowID;
 
-        PlatformWindow *window;
-        if (window_id == impl_->mainWindowID) {
-          window = &impl_->mainWindow;
-        } else {
-          SDL_Window *sdl_hdl = REQ_SDL_PTR(SDL_GetWindowFromID(window_id));
-          SDL_PropertiesID window_props =
-            REQ_SDL_PROP(SDL_GetWindowProperties(sdl_hdl));
-
-          window = (PlatformWindow *)REQ_SDL_PTR(SDL_GetPointerProperty(
-            window_props, "gas_hdl", nullptr));
-        }
-
+        PlatformWindow *window = getPlatformWindow(window_id);
         window->shouldClose = true;
       } break;
       }
@@ -362,7 +384,7 @@ bool WindowManager::processEvents()
   return should_quit;
 }
 
-GPUAPI * WindowManager::gpuAPI()
+GPUAPI * UISystem::gpuAPI()
 {
   return impl_->gpuAPI;
 }

@@ -108,22 +108,22 @@ struct StagingBelt {
   SpinLock lock;
 };
 
-struct TmpDynUniformBuffer {
+struct TmpGPUBuffer {
   wgpu::Buffer buffer;
   wgpu::BindGroup bindGroup;
 };
 
 struct GPUTmpInputState {
-  std::array<TmpDynUniformBuffer, MAX_TMP_BUFFERS_PER_QUEUE>
-      dynUniformBuffers;
+  std::array<TmpGPUBuffer, MAX_TMP_BUFFERS_PER_QUEUE>
+      tmpGPUBuffers;
 
   std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> activeStagingBuffers;
 
-  std::array<i32, MAX_TMP_STAGING_BUFFERS> stagingBeltIdxToDynUniform;
+  std::array<i32, MAX_TMP_STAGING_BUFFERS> stagingBeltIdxToTmpGPU;
 
   alignas(MADRONA_CACHE_LINE) u64 curStagingRange;
-  alignas(MADRONA_CACHE_LINE) u32 numDynUniforms;
-  u32 maxNumUsedDynUniforms;
+  alignas(MADRONA_CACHE_LINE) u32 numTmpGPUBuffers;
+  u32 maxNumUsedTmpGPUBuffers;
   SpinLock lock {};
 };
 
@@ -339,8 +339,7 @@ public:
 
   //void allocTmpDynUniformBlock(BackendQueueData &queue_data);
 
-  inline i32 allocTmpDynUniformBuffer(
-      GPUTmpInputState &state);
+  inline i32 allocTmpGPUBuffer(GPUTmpInputState &state);
 
   i32 unmapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input);
   void mapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input,

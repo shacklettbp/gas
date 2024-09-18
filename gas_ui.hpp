@@ -10,13 +10,14 @@
 namespace gas {
 
 struct Window {
-  i32 width;
-  i32 height;
+  i32 pixelWidth;
+  i32 pixelHeight;
+  f32 systemUIScale;
   bool shouldClose;
   Surface surface;
 };
 
-class WindowManager {
+class UISystem {
 public:
   struct Config {
     bool enableValidation = false;
@@ -25,19 +26,21 @@ public:
       Optional<GPUAPISelect>::none();
   };
 
-  static WindowManager init(const Config &cfg);
+  static UISystem init(const Config &cfg);
   void shutdown();
 
   Window * createWindow(const char *title,
-                        i32 width,
-                        i32 height);
+                        i32 starting_pixel_width,
+                        i32 starting_pixel_height);
 
   Window * createMainWindow(const char *title,
-                            i32 width,
-                            i32 height);
+                            i32 starting_pixel_width,
+                            i32 starting_pixel_height);
 
   void destroyWindow(Window *window);
   void destroyMainWindow();
+
+  Window * getMainWindow();
 
   bool processEvents();
 
@@ -46,7 +49,7 @@ public:
 private:
   struct Impl;
   Impl *impl_;
-  inline WindowManager(Impl *impl);
+  inline UISystem(Impl *impl);
 
   friend class WindowHandle;
 };

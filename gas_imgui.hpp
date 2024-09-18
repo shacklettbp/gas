@@ -6,7 +6,7 @@
 namespace gas {
 namespace ImGuiSystem {
 
-void init(WindowManager &wm,
+void init(UISystem &ui_sys,
           GPURuntime *gpu,
           GPUQueue tx_queue,
           ShaderCompiler *shaderc,
@@ -20,7 +20,7 @@ void reloadFonts(GPURuntime *gpu,
                  const char *font_path,
                  float font_size);
 
-void beginFrame(GPURuntime *gpu);
+void beginFrame(UISystem &ui_sys, float ui_scale, float delta_t);
 void endFrame(RasterPassEncoder &enc);
 
 }

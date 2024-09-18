@@ -2,26 +2,36 @@
 #include <gas/gas_imgui.hpp>
 #include <gas/shader_compiler.hpp>
 
+namespace {
+
+void buildUI()
+{
+  ImGui::Begin("ImGui Window");
+  ImGui::End();
+}
+
+}
+
 int main(int argc, char *argv[])
 {
   using namespace gas;
   using namespace gas;
 
-  WindowManager wm = WindowManager::init(WindowManager::Config {
+  UISystem ui_sys = UISystem::init(UISystem::Config {
     .enableValidation = true,
     .runtimeErrorsAreFatal = true,
   });
 
   {
-    bool should_exit = wm.processEvents();
+    bool should_exit = ui_sys.processEvents();
     if (should_exit) {
       return 0;
     }
   }
 
-  GPUAPI *gpu_api = wm.gpuAPI();
+  GPUAPI *gpu_api = ui_sys.gpuAPI();
 
-  Window *window = wm.createMainWindow("Labyrinth", 1920, 1080);
+  Window *window = ui_sys.createMainWindow("Labyrinth", 1920, 1080);
   
   ShaderCompilerLib shaderc_lib = InitSystem::loadShaderCompiler();
   auto backend_bytecode_type = gpu_api->backendShaderByteCodeType();
@@ -63,7 +73,7 @@ int main(int argc, char *argv[])
     }},
   });
 
-  ImGuiSystem::init(wm, gpu, main_queue, shaderc, imgui_pass_interface,
+  ImGuiSystem::init(ui_sys, gpu, main_queue, shaderc, imgui_pass_interface,
       GAS_EXAMPLES_DIR "imgui_font.ttf", 16.f);
 
   RasterPass imgui_pass = gpu->createRasterPass({
@@ -129,13 +139,14 @@ int main(int argc, char *argv[])
   CommandEncoder enc = gpu->createCommandEncoder(main_queue);
   while (true) {
     {
-      bool should_exit = wm.processEvents();
+      bool should_exit = ui_sys.processEvents();
       if (should_exit || window->shouldClose) {
         break;
       }
-
-      ImGuiSystem::beginFrame(gpu);
+      ImGuiSystem::beginFrame(ui_sys, window->systemUIScale, 1.f / 60.f);
     }
+
+    buildUI();
 
     gpu->waitUntilReady(main_queue);
 
@@ -204,6 +215,6 @@ int main(int argc, char *argv[])
 
   InitSystem::unloadShaderCompiler(shaderc_lib);
 
-  wm.destroyMainWindow();
-  wm.shutdown();
+  ui_sys.destroyMainWindow();
+  ui_sys.shutdown();
 }

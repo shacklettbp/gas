@@ -7,8 +7,6 @@ namespace gas {
 namespace {
 
 struct ImGuiBackend {
-  WindowManager *wm;
-
   ParamBlockType paramBlockType;
   RasterShader shader;
   Sampler fontSampler;
@@ -66,8 +64,8 @@ void loadFonts(GPURuntime *gpu,
   float scaled_font_size = font_size * scale_factor;
   io.Fonts->AddFontFromFileTTF(font_path, scaled_font_size);
 
-  auto &style = ImGui::GetStyle();
-  style.ScaleAllSizes(scale_factor);
+  //auto &style = ImGui::GetStyle();
+  //style.ScaleAllSizes(scale_factor);
 
   u8 *atlas_pixels;
   int atlas_width, atlas_height;
@@ -109,14 +107,13 @@ void unloadFonts(GPURuntime *gpu)
 
 namespace ImGuiSystem {
 
-void init(
-    WindowManager &wm,
-    GPURuntime *gpu,
-    GPUQueue tx_queue,
-    ShaderCompiler *shaderc,
-    RasterPassInterface raster_pass_interface,
-    const char *font_path,
-    float font_size)
+void init(UISystem &ui_sys,
+          GPURuntime *gpu,
+          GPUQueue tx_queue,
+          ShaderCompiler *shaderc,
+          RasterPassInterface raster_pass_interface,
+          const char *font_path,
+          float font_size)
 {
   using enum ShaderStage;
   using enum SamplerAddressMode;
@@ -150,7 +147,6 @@ void init(
     return "";
   };
 
-  bd->wm = &wm;
   bd->paramBlockType = gpu->createParamBlockType({
     .uuid = "imgui_param_block"_to_uuid,
     .textures = {
@@ -197,9 +193,17 @@ void reloadFonts(GPURuntime *gpu,
   loadFonts(gpu, tx_queue, font_path, font_size);
 }
 
-void beginFrame(GPURuntime *gpu)
+void beginFrame(UISystem &ui_sys, float ui_scale, float delta_t)
 {
-  (void)gpu;
+  Window *window = ui_sys.getMainWindow();
+
+  ImGuiIO &io = ImGui::GetIO();
+  io.DisplaySize = ImVec2(window->pixelWidth / ui_scale,
+                          window->pixelHeight / ui_scale);
+  io.DisplayFramebufferScale = ImVec2(ui_scale, ui_scale);
+
+  io.DeltaTime = delta_t;
+
   ImGui::NewFrame();
 }
 
@@ -211,22 +215,6 @@ void endFrame(RasterPassEncoder &enc)
   ImGui::Render();
   ImDrawData *draw_data = ImGui::GetDrawData();
 
-#if 0
-  struct ImDrawData
-  {
-    bool                Valid;              // Only valid after Render() is called and before the next NewFrame() is called.
-    int                 CmdListsCount;      // Number of ImDrawList* to render (should always be == CmdLists.size)
-    int                 TotalIdxCount;      // For convenience, sum of all ImDrawList's IdxBuffer.Size
-    int                 TotalVtxCount;      // For convenience, sum of all ImDrawList's VtxBuffer.Size
-    ImVector<ImDrawList*> CmdLists;         // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
-    ImVec2              DisplayPos;         // Top-left position of the viewport to render (== top-left of the orthogonal projection matrix to use) (== GetMainViewport()->Pos for the main viewport, == (0.0) in most single-viewport applications)
-    ImVec2              DisplaySize;        // Size of the viewport to render (== GetMainViewport()->Size for the main viewport, == io.DisplaySize in most single-viewport applications)
-    ImVec2              FramebufferScale;   // Amount of pixels for each unit of DisplaySize. Based on io.DisplayFramebufferScale. Generally (1,1) on normal display, (2,2) on OSX with Retina display.
-    ImGuiViewport*      OwnerViewport;      // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
-
-  };
-#endif
-
   MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
     sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
 
@@ -237,12 +225,36 @@ void endFrame(RasterPassEncoder &enc)
       tmp_vertices.offset, (u32)sizeof(ImDrawVert));
   u32 cur_idx_offset = tmp_indices.offset / sizeof(u16);
 
+  enc.setShader(bd->shader);
+  enc.setParamBlock(0, bd->fontsParamBlock);
+  enc.setVertexBuffer(0, tmp_vertices.buffer);
+  enc.setIndexBufferU16(tmp_indices.buffer);
+
   for (i32 cmd_list_idx = 0; cmd_list_idx < (i32)draw_data->CmdListsCount;
        cmd_list_idx++) {
     ImDrawList *list = draw_data->CmdLists[cmd_list_idx];
-    
-  }
 
+
+    i32 num_list_vertices = list->VtxBuffer.Size;
+    ImDrawVert *vert_buffer = list->VtxBuffer.Data;
+    memcpy(tmp_vertices.ptr, vert_buffer, sizeof(ImDrawVert) * num_list_vertices);
+
+    i32 num_list_idxs = list->IdxBuffer.Size;
+    ImDrawIdx *idx_buffer = list->IdxBuffer.Data;
+    memcpy(tmp_indices.ptr, idx_buffer, sizeof(ImDrawIdx) * num_list_idxs);
+
+    i32 num_cmds = list->CmdBuffer.Size;
+    ImDrawCmd *cmds = list->CmdBuffer.Data;
+
+    for (i32 i = 0; i < num_cmds; i++) {
+      ImDrawCmd cmd = cmds[i];
+      enc.drawIndexed(cur_vert_offset + cmd.VtxOffset, cur_idx_offset + cmd.IdxOffset,
+                      cmd.ElemCount / 3);
+    }
+
+    cur_vert_offset += num_list_vertices;
+    cur_idx_offset += num_list_idxs;
+  }
 }
 
 }
