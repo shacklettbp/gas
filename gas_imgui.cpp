@@ -6,6 +6,11 @@
 namespace gas {
 namespace {
 
+struct CoordData {
+  Vector2 scale;
+  Vector2 translation;
+};
+
 struct ImGuiBackend {
   ParamBlockType paramBlockType;
   RasterShader shader;
@@ -44,6 +49,7 @@ RasterShader loadShader(GPURuntime *gpu,
         { .offset = offsetof(ImDrawVert, col), .format = Vec4_UNorm8 },
       }
     }},
+    .numPerDrawBytes = sizeof(CoordData),
     .rasterConfig = {
       .cullMode = CullMode::None,
       .blending = { BlendingConfig::additiveDefault() },
@@ -215,9 +221,6 @@ void render(RasterPassEncoder &enc)
   ImGui::Render();
   ImDrawData *draw_data = ImGui::GetDrawData();
 
-  assert(draw_data->DisplayPos.x == 0 &&
-        draw_data->DisplayPos.y == 0);
-
   MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
     sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
 
@@ -231,18 +234,30 @@ void render(RasterPassEncoder &enc)
       tmp_vertices.offset, (u32)sizeof(ImDrawVert));
   u32 base_draw_idx_offset = tmp_indices.offset / sizeof(u16);
 
-  printf("\n");
-  printf("%u %u\n", base_draw_vert_offset, base_draw_idx_offset);
-
   enc.setShader(bd->shader);
   enc.setParamBlock(0, bd->fontsParamBlock);
   enc.setVertexBuffer(0, tmp_vertices.buffer);
   enc.setIndexBufferU16(tmp_indices.buffer);
 
+  { // Set CoordData
+    Vector2 scale {
+      2.f / draw_data->DisplaySize.x,
+      2.f / draw_data->DisplaySize.y,
+    };
+
+    Vector2 translation {
+      -1.f - draw_data->DisplayPos.x * scale.x,
+      -1.f - draw_data->DisplayPos.y * scale.y,
+    };
+
+    printf("%f %f %f %f\n", scale.x, scale.y, translation.x, translation.y);
+
+    enc.drawData(CoordData { scale, translation });
+  }
+
   for (i32 cmd_list_idx = 0; cmd_list_idx < (i32)draw_data->CmdListsCount;
        cmd_list_idx++) {
     ImDrawList *list = draw_data->CmdLists[cmd_list_idx];
-
 
     i32 num_list_vertices = list->VtxBuffer.Size;
     ImDrawVert *vert_buffer = list->VtxBuffer.Data;
@@ -252,8 +267,6 @@ void render(RasterPassEncoder &enc)
     ImDrawIdx *idx_buffer = list->IdxBuffer.Data;
     memcpy(tmp_idxs_out, idx_buffer, sizeof(ImDrawIdx) * num_list_idxs);
 
-    printf("%d %d\n", num_list_vertices, num_list_idxs);
-
     i32 num_cmds = list->CmdBuffer.Size;
     ImDrawCmd *cmds = list->CmdBuffer.Data;
 
@@ -262,18 +275,6 @@ void render(RasterPassEncoder &enc)
       enc.drawIndexed(base_draw_vert_offset + cmd.VtxOffset, 
                       base_draw_idx_offset + cmd.IdxOffset,
                       cmd.ElemCount / 3);
-
-      for (i32 j = 0; j < cmd.ElemCount; j++) {
-        u16 idx = tmp_idxs_out[cmd.IdxOffset];
-        ImDrawVert vert = tmp_verts_out[cmd.VtxOffset + idx];
-        printf("%u (%f %f)\n", (u32)idx, vert.pos.x, vert.pos.y);
-      }
-
-      printf("%f %f %f %f\n",
-             cmd.ClipRect.x,
-             cmd.ClipRect.y,
-             cmd.ClipRect.z,
-             cmd.ClipRect.w);
     }
 
     tmp_verts_out += num_list_vertices;

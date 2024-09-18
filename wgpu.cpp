@@ -2047,15 +2047,11 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
     wgpu::BindGroup dynamic_tmp_input_bind_group;
     i32 dynamic_bind_group_idx = -1;
-    for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
-#ifdef GAS_WGPU_DEBUG_PRINT
-      debugPrintDrawCommandCtrl(ctrl);
-#endif
-
-      bool draw = (ctrl & CommandCtrl::Draw) != CommandCtrl::None;
-      bool indexed_draw =
-        (ctrl & CommandCtrl::DrawIndexed) != CommandCtrl::None;
-      if (draw || indexed_draw) {
+    while (true) {
+      auto updateDrawState =
+        [&]
+      (CommandCtrl ctrl)
+      {
         if (RasterShader shader = decoder.drawShader(ctrl); !shader.null()) {
           BackendRasterShader *to_raster_shader = rasterShaders.hot(shader);
           pass_enc.SetPipeline(to_raster_shader->pipeline);
@@ -2119,20 +2115,44 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
     draw_params.vertexOffset, draw_params.instanceOffset);
 #endif
 
-        if (draw) {
+        return draw_params;
+      };
+
+      CommandCtrl ctrl = decoder.ctrl();
+
+#ifdef GAS_WGPU_DEBUG_PRINT
+      debugPrintDrawCommandCtrl(ctrl);
+#endif
+
+      CommandCtrl ctrl_masked = ctrl & 
+          (CommandCtrl::RasterDraw |
+           CommandCtrl::RasterDrawIndexed |
+           CommandCtrl::RasterScissors);
+
+      switch (ctrl_masked) {
+        case CommandCtrl::None: {
+          pass_enc.End();
+          return;
+        } break;
+        case CommandCtrl::RasterDraw: {
+          DrawParams draw_params = updateDrawState(ctrl);
+
           pass_enc.Draw(draw_params.numTriangles * 3,
                         draw_params.numInstances,
                         draw_params.vertexOffset,
                         draw_params.instanceOffset);
-        } else {
+        } break;
+        case CommandCtrl::RasterDrawIndexed: {
+          DrawParams draw_params = updateDrawState(ctrl);
+
           pass_enc.DrawIndexed(draw_params.numTriangles * 3,
                                draw_params.numInstances,
                                draw_params.indexOffset,
                                draw_params.vertexOffset,
                                draw_params.instanceOffset);
-        }
-      } else {
-        assert(false);
+        } break;
+        case CommandCtrl::RasterScissors: {
+        } break;
       }
     }
 
@@ -2143,13 +2163,19 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
   {
     decoder.resetCopyCommand();
 
-    for (CommandCtrl ctrl; (ctrl = decoder.ctrl()) != CommandCtrl::None;) {
+    while (true) {
+      CommandCtrl ctrl = decoder.ctrl();
+
       CommandCtrl ctrl_masked = ctrl & 
           (CommandCtrl::CopyCmdBufferToBuffer |
            CommandCtrl::CopyCmdBufferToTexture |
            CommandCtrl::CopyCmdTextureToBuffer |
            CommandCtrl::CopyCmdBufferClear);
+
       switch (ctrl_masked) {
+        case CommandCtrl::None: {
+          return;
+        } break;
         case CommandCtrl::CopyCmdBufferToBuffer: {
           CopyBufferToBufferCmd b2b =
               decoder.copyBufferToBuffer(ctrl);

@@ -374,13 +374,13 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
 {
   using enum CommandCtrl;
 
-  assert((ctrl & (Draw | DrawIndexed)) != None);
+  assert((ctrl & (RasterDraw | RasterDrawIndexed)) != None);
 
   printf("Draw Control: ");
-  if ((ctrl & Draw) != None) {
-    printf("Draw");
-  } else if ((ctrl & DrawIndexed) != None) {
-    printf("DrawIndexed");
+  if ((ctrl & RasterDraw) != None) {
+    printf("RasterDraw");
+  } else if ((ctrl & RasterDrawIndexed) != None) {
+    printf("RasterDrawIndexed");
   }
 
   if ((ctrl & DrawShader) != None) {

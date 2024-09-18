@@ -269,7 +269,7 @@ void RasterPassEncoder::drawInstanced(
   u32 vertex_offset, u32 num_triangles,
   u32 instance_offset, u32 num_instances)
 {
-  encodeDraw(CommandCtrl::Draw, vertex_offset,
+  encodeDraw(CommandCtrl::RasterDraw, vertex_offset,
              0, num_triangles,
              instance_offset, num_instances);
 }
@@ -279,7 +279,7 @@ void RasterPassEncoder::drawIndexedInstanced(
   u32 index_offset, u32 num_triangles,
   u32 instance_offset, u32 num_instances)
 {
-  encodeDraw(CommandCtrl::DrawIndexed, vertex_offset,
+  encodeDraw(CommandCtrl::RasterDrawIndexed, vertex_offset,
              index_offset, num_triangles,
              instance_offset, num_instances);
 }

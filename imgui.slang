@@ -15,14 +15,20 @@ struct FontParams {
   SamplerState sampler;
 };
 
+struct CoordData {
+  float2 scale;
+  float2 translation;
+};
+
 ParameterBlock<FontParams> fontParams;
+
+ParameterBlock<CoordData> coordData;
 
 [shader("vertex")]
 V2F vertMain(VertInput v)
 {
   V2F out;
-  out.pos = float4(v.pos, 0, 1);
-  //gl_Position = vec4(aPos * pc.uScale + pc.uTranslate, 0, 1);
+  out.pos = float4(v.pos * coordData.scale + coordData.translation, 0, 1);
   out.color = v.color;
   out.uv = v.uv;
 
