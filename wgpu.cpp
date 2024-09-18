@@ -2152,7 +2152,12 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
                                draw_params.instanceOffset);
         } break;
         case CommandCtrl::RasterScissors: {
+          ScissorParams scissors = decoder.scissorParams();
+
+          pass_enc.SetScissorRect(scissors.offsetX, scissors.offsetY,
+                                  scissors.width, scissors.height);
         } break;
+        default: MADRONA_UNREACHABLE();
       }
     }
 

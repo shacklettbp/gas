@@ -17,6 +17,9 @@ struct ImGuiBackend {
   Sampler fontSampler;
   Texture fontsTexture;
   ParamBlock fontsParamBlock;
+
+  i32 fbWidth;
+  i32 fbHeight;
 };
 
 RasterShader loadShader(GPURuntime *gpu,
@@ -204,6 +207,10 @@ void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
   Window *window = ui_sys.getMainWindow();
 
   ImGuiIO &io = ImGui::GetIO();
+  auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+  bd->fbWidth = window->pixelWidth;
+  bd->fbHeight = window->pixelHeight;
+
   io.DisplaySize = ImVec2(window->pixelWidth / ui_scale,
                           window->pixelHeight / ui_scale);
   io.DisplayFramebufferScale = ImVec2(ui_scale, ui_scale);
@@ -239,6 +246,16 @@ void render(RasterPassEncoder &enc)
   enc.setVertexBuffer(0, tmp_vertices.buffer);
   enc.setIndexBufferU16(tmp_indices.buffer);
 
+  Vector2 clip_offset {
+    draw_data->DisplayPos.x,
+    draw_data->DisplayPos.y,
+  };
+
+  Vector2 clip_scale {
+    draw_data->FramebufferScale.x,
+    draw_data->FramebufferScale.y,
+  };
+
   { // Set CoordData
     Vector2 scale {
       2.f / draw_data->DisplaySize.x,
@@ -246,11 +263,9 @@ void render(RasterPassEncoder &enc)
     };
 
     Vector2 translation {
-      -1.f - draw_data->DisplayPos.x * scale.x,
-      -1.f - draw_data->DisplayPos.y * scale.y,
+      -1.f - clip_offset.x * scale.x,
+      -1.f - clip_offset.y * scale.y,
     };
-
-    printf("%f %f %f %f\n", scale.x, scale.y, translation.x, translation.y);
 
     enc.drawData(CoordData { scale, translation });
   }
@@ -272,6 +287,25 @@ void render(RasterPassEncoder &enc)
 
     for (i32 i = 0; i < num_cmds; i++) {
       ImDrawCmd cmd = cmds[i];
+
+      // Project scissor/clipping rectangles into framebuffer space
+      i32 clip_min_x = std::max(
+          i32(clip_scale.x * (cmd.ClipRect.x - clip_offset.x)), 0_i32);
+      i32 clip_min_y = std::max(
+          i32(clip_scale.y * (cmd.ClipRect.y - clip_offset.y)), 0_i32);
+
+      i32 clip_max_x = std::min(
+          i32(clip_scale.x * (cmd.ClipRect.z - clip_offset.x)), bd->fbWidth);
+      i32 clip_max_y = std::min(
+          i32(clip_scale.y * (cmd.ClipRect.w - clip_offset.y)), bd->fbHeight);
+
+      if (clip_max_x <= clip_min_x || clip_max_y <= clip_min_y) {
+        continue;
+      }
+
+      enc.setDrawScissors(clip_min_x, clip_min_y,
+          clip_max_x - clip_min_x, clip_max_y - clip_min_y);
+
       enc.drawIndexed(base_draw_vert_offset + cmd.VtxOffset, 
                       base_draw_idx_offset + cmd.IdxOffset,
                       cmd.ElemCount / 3);

@@ -605,6 +605,9 @@ struct GPUTmpInputBlock
 
 class RasterPassEncoder {
 public:
+  inline void setDrawScissors(u32 offset_x, u32 offset_y,
+                              u32 width, u32 height);
+
   inline void setShader(RasterShader shader);
   inline void setParamBlock(i32 idx, ParamBlock param_block);
   inline void setVertexBuffer(i32 idx, Buffer buffer);
@@ -645,6 +648,7 @@ private:
   GPUTmpInputBlock gpu_input_;
   CommandCtrl ctrl_;
   DrawCommand state_;
+  std::array<u32, 4> draw_scissors_;
 
 friend class CommandEncoder;
 };

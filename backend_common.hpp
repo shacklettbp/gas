@@ -370,6 +370,13 @@ struct DrawParams {
   u32 numInstances = 1;
 };
 
+struct ScissorParams {
+  u32 offsetX;
+  u32 offsetY;
+  u32 width;
+  u32 height;
+};
+
 inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
 {
   using enum CommandCtrl;
@@ -596,6 +603,22 @@ public:
     }
 
     return draw_params_;
+  }
+
+  inline ScissorParams scissorParams()
+  {
+    // Could pack these
+    u32 offset_x = next();
+    u32 offset_y = next();
+    u32 width = next();
+    u32 height = next();
+
+    return ScissorParams {
+      .offsetX = offset_x,
+      .offsetY = offset_y,
+      .width = width,
+      .height = height,
+    };
   }
 
   inline CopyBufferToBufferCmd copyBufferToBuffer(CommandCtrl ctrl)

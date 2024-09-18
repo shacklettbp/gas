@@ -133,6 +133,25 @@ bool GPUTmpInputBlock::blockFull() const
   return offset > BLOCK_SIZE; 
 }
 
+void RasterPassEncoder::setDrawScissors(u32 offset_x, u32 offset_y,
+                                        u32 width, u32 height)
+{
+  if (offset_x == draw_scissors_[0] &&
+      offset_y == draw_scissors_[1] &&
+      width == draw_scissors_[2] &&
+      height == draw_scissors_[3]) {
+    return;
+  }
+
+  draw_scissors_ = { offset_x, offset_y, width, height };
+
+  writer_.ctrl(gpu_, CommandCtrl::RasterScissors);
+  writer_.writeU32(gpu_, offset_x);
+  writer_.writeU32(gpu_, offset_y);
+  writer_.writeU32(gpu_, width);
+  writer_.writeU32(gpu_, height);
+}
+
 void RasterPassEncoder::setShader(RasterShader shader)
 {
   if (state_.shader == shader) {
@@ -375,7 +394,8 @@ RasterPassEncoder::RasterPassEncoder(GPURuntime *gpu,
     queue_(queue),
     gpu_input_(gpu_input),
     ctrl_(CommandCtrl::None),
-    state_()
+    state_(),
+    draw_scissors_ { 0, 0, 0, 0 }
 {
   if (!gpu_input_.buffer.null()) {
     state_.dataBuffer = gpu_input_.buffer;
