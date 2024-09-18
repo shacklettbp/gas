@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 
   GPUAPI *gpu_api = ui_sys.gpuAPI();
 
-  Window *window = ui_sys.createMainWindow("Labyrinth", 1920, 1080);
+  Window *window = ui_sys.createMainWindow("GAS Example", 1920, 1080);
   
   ShaderCompilerLib shaderc_lib = InitSystem::loadShaderCompiler();
   auto backend_bytecode_type = gpu_api->backendShaderByteCodeType();

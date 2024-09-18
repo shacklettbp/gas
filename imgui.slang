@@ -15,20 +15,20 @@ struct FontParams {
   SamplerState sampler;
 };
 
-struct CoordData {
+struct VertexTransform {
   float2 scale;
   float2 translation;
 };
 
 ParameterBlock<FontParams> fontParams;
 
-ParameterBlock<CoordData> coordData;
+ParameterBlock<VertexTransform> vertTxfm;
 
 [shader("vertex")]
 V2F vertMain(VertInput v)
 {
   V2F out;
-  out.pos = float4(v.pos * coordData.scale + coordData.translation, 0, 1);
+  out.pos = float4(v.pos * vertTxfm.scale + vertTxfm.translation, 0, 1);
   out.color = v.color;
   out.uv = v.uv;
 

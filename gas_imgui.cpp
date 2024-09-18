@@ -6,7 +6,7 @@
 namespace gas {
 namespace {
 
-struct CoordData {
+struct VertexTransform {
   Vector2 scale;
   Vector2 translation;
 };
@@ -52,7 +52,7 @@ RasterShader loadShader(GPURuntime *gpu,
         { .offset = offsetof(ImDrawVert, col), .format = Vec4_UNorm8 },
       }
     }},
-    .numPerDrawBytes = sizeof(CoordData),
+    .numPerDrawBytes = sizeof(VertexTransform),
     .rasterConfig = {
       .cullMode = CullMode::None,
       .blending = { BlendingConfig::additiveDefault() },
@@ -234,12 +234,19 @@ void render(RasterPassEncoder &enc)
   MappedTmpBuffer tmp_indices = enc.tmpBuffer(
     sizeof(ImDrawIdx) * draw_data->TotalIdxCount);
 
-  ImDrawVert *tmp_verts_out = (ImDrawVert *)tmp_vertices.ptr;
-  ImDrawIdx *tmp_idxs_out = (ImDrawIdx *)tmp_indices.ptr;
-
   u32 base_draw_vert_offset = utils::divideRoundUp(
       tmp_vertices.offset, (u32)sizeof(ImDrawVert));
-  u32 base_draw_idx_offset = tmp_indices.offset / sizeof(u16);
+  u32 base_draw_idx_offset = tmp_indices.offset / sizeof(ImDrawIdx);
+
+  ImDrawVert *tmp_verts_out;
+  {
+    u32 alignment_offset =
+        base_draw_vert_offset * sizeof(ImDrawVert) - tmp_vertices.offset;
+
+    tmp_verts_out = (ImDrawVert *)(tmp_vertices.ptr + alignment_offset);
+  }
+
+  ImDrawIdx *tmp_idxs_out = (ImDrawIdx *)tmp_indices.ptr;
 
   enc.setShader(bd->shader);
   enc.setParamBlock(0, bd->fontsParamBlock);
@@ -256,18 +263,18 @@ void render(RasterPassEncoder &enc)
     draw_data->FramebufferScale.y,
   };
 
-  { // Set CoordData
-    Vector2 scale {
+  { // Setup VertexTransform Dynamic Uniform
+    Vector2 vert_scale {
       2.f / draw_data->DisplaySize.x,
       2.f / draw_data->DisplaySize.y,
     };
 
-    Vector2 translation {
-      -1.f - clip_offset.x * scale.x,
-      -1.f - clip_offset.y * scale.y,
+    Vector2 vert_translation {
+      -1.f - clip_offset.x * vert_scale.x,
+      -1.f - clip_offset.y * vert_scale.y,
     };
 
-    enc.drawData(CoordData { scale, translation });
+    enc.drawData(VertexTransform { vert_scale, vert_translation });
   }
 
   for (i32 cmd_list_idx = 0; cmd_list_idx < (i32)draw_data->CmdListsCount;
