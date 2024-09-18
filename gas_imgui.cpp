@@ -193,7 +193,7 @@ void reloadFonts(GPURuntime *gpu,
   loadFonts(gpu, tx_queue, font_path, font_size);
 }
 
-void beginFrame(UISystem &ui_sys, float ui_scale, float delta_t)
+void newFrame(UISystem &ui_sys, float ui_scale, float delta_t)
 {
   Window *window = ui_sys.getMainWindow();
 
@@ -207,7 +207,7 @@ void beginFrame(UISystem &ui_sys, float ui_scale, float delta_t)
   ImGui::NewFrame();
 }
 
-void endFrame(RasterPassEncoder &enc)
+void render(RasterPassEncoder &enc)
 {
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
@@ -215,15 +215,24 @@ void endFrame(RasterPassEncoder &enc)
   ImGui::Render();
   ImDrawData *draw_data = ImGui::GetDrawData();
 
+  assert(draw_data->DisplayPos.x == 0 &&
+        draw_data->DisplayPos.y == 0);
+
   MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
     sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
 
   MappedTmpBuffer tmp_indices = enc.tmpBuffer(
-    sizeof(u16) * draw_data->TotalIdxCount);
+    sizeof(ImDrawIdx) * draw_data->TotalIdxCount);
 
-  u32 cur_vert_offset = utils::divideRoundUp(
+  ImDrawVert *tmp_verts_out = (ImDrawVert *)tmp_vertices.ptr;
+  ImDrawIdx *tmp_idxs_out = (ImDrawIdx *)tmp_indices.ptr;
+
+  u32 base_draw_vert_offset = utils::divideRoundUp(
       tmp_vertices.offset, (u32)sizeof(ImDrawVert));
-  u32 cur_idx_offset = tmp_indices.offset / sizeof(u16);
+  u32 base_draw_idx_offset = tmp_indices.offset / sizeof(u16);
+
+  printf("\n");
+  printf("%u %u\n", base_draw_vert_offset, base_draw_idx_offset);
 
   enc.setShader(bd->shader);
   enc.setParamBlock(0, bd->fontsParamBlock);
@@ -237,23 +246,40 @@ void endFrame(RasterPassEncoder &enc)
 
     i32 num_list_vertices = list->VtxBuffer.Size;
     ImDrawVert *vert_buffer = list->VtxBuffer.Data;
-    memcpy(tmp_vertices.ptr, vert_buffer, sizeof(ImDrawVert) * num_list_vertices);
+    memcpy(tmp_verts_out, vert_buffer, sizeof(ImDrawVert) * num_list_vertices);
 
     i32 num_list_idxs = list->IdxBuffer.Size;
     ImDrawIdx *idx_buffer = list->IdxBuffer.Data;
-    memcpy(tmp_indices.ptr, idx_buffer, sizeof(ImDrawIdx) * num_list_idxs);
+    memcpy(tmp_idxs_out, idx_buffer, sizeof(ImDrawIdx) * num_list_idxs);
+
+    printf("%d %d\n", num_list_vertices, num_list_idxs);
 
     i32 num_cmds = list->CmdBuffer.Size;
     ImDrawCmd *cmds = list->CmdBuffer.Data;
 
     for (i32 i = 0; i < num_cmds; i++) {
       ImDrawCmd cmd = cmds[i];
-      enc.drawIndexed(cur_vert_offset + cmd.VtxOffset, cur_idx_offset + cmd.IdxOffset,
+      enc.drawIndexed(base_draw_vert_offset + cmd.VtxOffset, 
+                      base_draw_idx_offset + cmd.IdxOffset,
                       cmd.ElemCount / 3);
+
+      for (i32 j = 0; j < cmd.ElemCount; j++) {
+        u16 idx = tmp_idxs_out[cmd.IdxOffset];
+        ImDrawVert vert = tmp_verts_out[cmd.VtxOffset + idx];
+        printf("%u (%f %f)\n", (u32)idx, vert.pos.x, vert.pos.y);
+      }
+
+      printf("%f %f %f %f\n",
+             cmd.ClipRect.x,
+             cmd.ClipRect.y,
+             cmd.ClipRect.z,
+             cmd.ClipRect.w);
     }
 
-    cur_vert_offset += num_list_vertices;
-    cur_idx_offset += num_list_idxs;
+    tmp_verts_out += num_list_vertices;
+    tmp_idxs_out += num_list_idxs;
+    base_draw_vert_offset += num_list_vertices;
+    base_draw_idx_offset += num_list_idxs;
   }
 }
 

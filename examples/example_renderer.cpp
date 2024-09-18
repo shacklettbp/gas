@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
       if (should_exit || window->shouldClose) {
         break;
       }
-      ImGuiSystem::beginFrame(ui_sys, window->systemUIScale, 1.f / 60.f);
+      ImGuiSystem::newFrame(ui_sys, window->systemUIScale, 1.f / 60.f);
     }
 
     buildUI();
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
 
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(imgui_pass);
-      ImGuiSystem::endFrame(raster_enc);
+      ImGuiSystem::render(raster_enc);
       enc.endRasterPass(raster_enc);
     }
 

@@ -20,8 +20,8 @@ void reloadFonts(GPURuntime *gpu,
                  const char *font_path,
                  float font_size);
 
-void beginFrame(UISystem &ui_sys, float ui_scale, float delta_t);
-void endFrame(RasterPassEncoder &enc);
+void newFrame(UISystem &ui_sys, float ui_scale, float delta_t);
+void render(RasterPassEncoder &enc);
 
 }
 }
