@@ -105,7 +105,8 @@ function(gas_link_hermetic_libcxx tgt)
   target_include_directories(${tgt} SYSTEM PRIVATE
     $<BUILD_INTERFACE:${HERMETIC_LIBCXX_PATH}/include/c++/v1>)
   target_link_libraries(${tgt} PRIVATE
-    ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a )
+    ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a
+  )
 endfunction()
 
 if (GAS_USE_DAWN)

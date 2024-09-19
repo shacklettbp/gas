@@ -510,6 +510,10 @@ bool UIBackend::processEvents()
           }
 
           userInput.mouse_pos_ = { e.motion.x, e.motion.y };
+#ifdef SDL_PLATFORM_MACOS
+          // macOS reports mouse in half pixel coords for hidpi displays
+          userInput.mouse_pos_ *= 2.f;
+#endif
         } break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
           InputID id = sdlMouseButtonToInputID(e.button.button);
@@ -574,11 +578,6 @@ bool UIBackend::processEvents()
       }
     }
   } while (num_events == events.size());
-
-#ifdef SDL_PLATFORM_MACOS
-  // macOS reports mouse in half pixel coords for hidpi displays
-  userInput.mouse_pos_ *= 2.f;
-#endif
 
 #endif
 

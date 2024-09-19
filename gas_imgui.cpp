@@ -74,7 +74,7 @@ void loadFonts(GPURuntime *gpu,
   io.Fonts->Clear();
   ImFontConfig font_cfg;
   font_cfg.RasterizerDensity = ui_scale;
-  auto font = io.Fonts->AddFontFromFileTTF(font_path, font_size, &font_cfg);
+  io.Fonts->AddFontFromFileTTF(font_path, font_size, &font_cfg);
 
   //auto &style = ImGui::GetStyle();
   //style.ScaleAllSizes(1.f);

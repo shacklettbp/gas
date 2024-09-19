@@ -20,11 +20,9 @@ function(fetch_build_dawn)
     FetchContent_GetProperties(MadronaBundledToolchain)
 
     set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
-    set(OP_NEWDEL_PATH "${madronabundledtoolchain_SOURCE_DIR}/toolchain-standalone-op-newdel/lib/libmadrona_toolchain_standalone_op_newdel.a")
-
     set(HERMETIC_LIBCXX_INC_FLAGS "-nostdinc++ -isystem ${HERMETIC_LIBCXX_PATH}/include/c++/v1")
     set(HERMETIC_LIBCXX_LINKER_FLAGS
-        "-nostdlib++ ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a ${OP_NEWDEL_PATH}")
+        "-nostdlib++ ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a")
 else ()
     set(HERMETIC_LIBCXX_INC_FLAGS "")
     set(HERMETIC_LIBCXX_LINKER_FLAGS "")
