@@ -33,6 +33,23 @@ enum class InputID : u32 {
   NUM_IDS,
 };
 
+class UserInputEvents {
+public:
+  inline bool downEvent(InputID id) const;
+  inline bool upEvent(InputID id) const;
+
+  void merge(const UserInputEvents &o);
+  void clear();
+
+private:
+  static constexpr inline u32 NUM_BITFIELDS =
+      2 * utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
+
+  std::array<u32, NUM_BITFIELDS> events_;
+
+friend struct UIBackend;
+};
+
 class UserInput {
 public:
   inline Vector2 mousePosition() const;
@@ -43,14 +60,16 @@ public:
   inline bool downEvent(InputID id) const;
   inline bool upEvent(InputID id) const;
 
+  inline const UserInputEvents & events() const;
+
 private:
   static constexpr inline u32 NUM_BITFIELDS =
-      utils::divideRoundUp((u32)InputID::NUM_IDS, 8_u32);
+      utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
 
   Vector2 mouse_pos_;
 
-  std::array<u8, NUM_BITFIELDS> states_;
-  std::array<u8, NUM_BITFIELDS * 2> events_;
+  std::array<u32, NUM_BITFIELDS> states_;
+  UserInputEvents events_;
 
 friend struct UIBackend;
 };

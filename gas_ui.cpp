@@ -335,23 +335,35 @@ void UIBackend::destroyMainWindow()
   cleanupWindow(&mainWindow, gpuAPI);
 }
 
+void UserInputEvents::merge(const UserInputEvents &o)
+{
+  for (i32 i = 0; i < (i32)events_.size(); i++) {
+    events_[i] |= o.events_[i];
+  }
+}
+
+void UserInputEvents::clear()
+{
+  utils::zeroN<u32>(events_.data(), events_.size());
+}
+
 bool UIBackend::processEvents()
 {
   bool should_quit = false;
 
-  utils::zeroN<u8>(userInput.events_.data(), userInput.events_.size());
+  userInput.events_.clear();
 
   auto updateInputEvent =
     [this]
   (InputID id, bool down)
   {
-    i32 event_idx = (i32)id / 4;
-    i32 event_bit = (i32)id % 4;
+    i32 event_idx = (i32)id / 16;
+    i32 event_bit = (i32)id % 16;
 
     if (down) {
-      userInput.events_[event_idx] |= (1 << (2 * event_bit));
+      userInput.events_.events_[event_idx] |= (1 << (2 * event_bit));
     } else {
-      userInput.events_[event_idx] |= (1 << (2 * event_bit + 1));
+      userInput.events_.events_[event_idx] |= (1 << (2 * event_bit + 1));
     }
   };
 
@@ -359,8 +371,8 @@ bool UIBackend::processEvents()
     [this]
   (InputID id, bool down)
   {
-    i32 state_idx = (i32)id / 8;
-    i32 state_bit = (i32)id % 8;
+    i32 state_idx = (i32)id / 32;
+    i32 state_bit = (i32)id % 32;
 
     if (down) {
       userInput.states_[state_idx] |= (1 << state_bit);
