@@ -605,6 +605,8 @@ struct GPUTmpInputBlock
 
 class RasterPassEncoder {
 public:
+  inline RasterPassEncoder();
+
   inline void setDrawScissors(u32 offset_x, u32 offset_y,
                               u32 width, u32 height);
 
@@ -654,11 +656,17 @@ friend class CommandEncoder;
 };
 
 class ComputePassEncoder {
+public:
+  inline ComputePassEncoder();
+
+private:
 friend class CommandEncoder;
 };
 
 class CopyPassEncoder {
 public:
+  inline CopyPassEncoder();
+
   inline void copyBufferToBuffer(Buffer src, Buffer dst,
                                  u32 src_offset, u32 dst_offset,
                                  u32 num_bytes);

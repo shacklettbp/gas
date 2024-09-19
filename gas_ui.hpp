@@ -99,6 +99,9 @@ public:
 
   Window * getMainWindow();
 
+  void enableRawMouseInput(Window *window);
+  void disableRawMouseInput(Window *window);
+
   bool processEvents();
 
   UserInput & inputState();

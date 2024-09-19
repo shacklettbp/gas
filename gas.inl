@@ -797,14 +797,6 @@ void GPURuntime::destroyRasterShader(RasterShader shader)
   destroyRasterShaders(1, &shader);
 }
 
-CommandEncoder::CommandEncoder()
-  : gpu_(nullptr),
-    cmds_head_(nullptr),
-    cmd_writer_(),
-    queue_(),
-    gpu_input_()
-{}
-
 CommandEncoder::CommandEncoder(GPURuntime *gpu,
                                GPUQueue queue)
   : gpu_(gpu),
@@ -813,6 +805,11 @@ CommandEncoder::CommandEncoder(GPURuntime *gpu,
     queue_(queue),
     gpu_input_()
 {}
+
+RasterPassEncoder::RasterPassEncoder() = default;
+ComputePassEncoder::ComputePassEncoder() = default;
+CopyPassEncoder::CopyPassEncoder() = default;
+CommandEncoder::CommandEncoder() = default;
 
 GPUQueue GPURuntime::getMainQueue()
 {

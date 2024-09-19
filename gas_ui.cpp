@@ -72,6 +72,9 @@ struct UIBackend : public UISystem {
   inline void destroyWindow(Window *window);
   inline void destroyMainWindow();
 
+  inline void enableRawMouseInput(Window *window_base);
+  inline void disableRawMouseInput(Window *window_base);
+
   inline bool processEvents();
 };
 
@@ -347,6 +350,24 @@ void UserInputEvents::clear()
   utils::zeroN<u32>(events_.data(), events_.size());
 }
 
+void UIBackend::enableRawMouseInput(Window *window_base)
+{
+  PlatformWindow *window = (PlatformWindow *)window_base;
+#ifdef GAS_USE_SDL
+  SDL_Window *sdl_hdl = window->os.sdl;
+  REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, SDL_TRUE));
+#endif
+}
+
+void UIBackend::disableRawMouseInput(Window *window_base)
+{
+  PlatformWindow *window = (PlatformWindow *)window_base;
+#ifdef GAS_USE_SDL
+  SDL_Window *sdl_hdl = window->os.sdl;
+  REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, SDL_FALSE));
+#endif
+}
+
 bool UIBackend::processEvents()
 {
   bool should_quit = false;
@@ -600,6 +621,16 @@ void UISystem::destroyMainWindow()
 Window * UISystem::getMainWindow()
 {
   return &backend(this)->mainWindow;
+}
+
+void UISystem::enableRawMouseInput(Window *window)
+{
+  backend(this)->enableRawMouseInput(window);
+}
+
+void UISystem::disableRawMouseInput(Window *window)
+{
+  backend(this)->disableRawMouseInput(window);
 }
 
 bool UISystem::processEvents()
