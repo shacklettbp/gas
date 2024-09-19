@@ -1814,6 +1814,8 @@ void Backend::waitUntilIdle()
     FATAL("WebGPU backend waitUntilIdle: work done callback failure: %lu",
          (u64)queue_status);
   }
+
+  inst.ProcessEvents();
 }
 
 ShaderByteCodeType Backend::backendShaderByteCodeType()
