@@ -797,6 +797,14 @@ void GPURuntime::destroyRasterShader(RasterShader shader)
   destroyRasterShaders(1, &shader);
 }
 
+CommandEncoder::CommandEncoder()
+  : gpu_(nullptr),
+    cmds_head_(nullptr),
+    cmd_writer_(),
+    queue_(),
+    gpu_input_()
+{}
+
 CommandEncoder::CommandEncoder(GPURuntime *gpu,
                                GPUQueue queue)
   : gpu_(gpu),

@@ -691,6 +691,8 @@ friend class CommandEncoder;
 
 class CommandEncoder {
 public:
+  inline CommandEncoder();
+
   inline void beginEncoding();
   inline void endEncoding();
 

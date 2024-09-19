@@ -43,14 +43,11 @@ public:
   inline bool downEvent(InputID id) const;
   inline bool upEvent(InputID id) const;
 
-  inline bool doubleClickEvent(InputID id) const;
-
 private:
   static constexpr inline u32 NUM_BITFIELDS =
       utils::divideRoundUp((u32)InputID::NUM_IDS, 8_u32);
 
   Vector2 mouse_pos_;
-  u8 double_clicks_;
 
   std::array<u8, NUM_BITFIELDS> states_;
   std::array<u8, NUM_BITFIELDS * 2> events_;

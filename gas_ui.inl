@@ -33,15 +33,6 @@ bool UserInput::upEvent(InputID id) const
   return (events_[id_idx] & (1 << (2 * id_bit + 1))) != 0;
 }
 
-bool UserInput::doubleClickEvent(InputID id) const
-{
-  if ((u32)id > (u32)InputID::Mouse5) {
-    return false;
-  }
-
-  return (double_clicks_ & (1 << (u32)id)) != 0;
-}
-
 inline WindowState & operator|=(WindowState &a, WindowState b)
 {
     a = WindowState(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));

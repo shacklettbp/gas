@@ -339,7 +339,6 @@ bool UIBackend::processEvents()
 {
   bool should_quit = false;
 
-  userInput.double_clicks_ = 0;
   utils::zeroN<u8>(userInput.events_.data(), userInput.events_.size());
 
   auto updateInputEvent =
@@ -389,7 +388,7 @@ bool UIBackend::processEvents()
     }
   };
 
-  auto keyToInputID =
+  auto sdlKeyToInputID =
     []
   (SDL_Keycode key) -> InputID
   {
@@ -437,6 +436,19 @@ bool UIBackend::processEvents()
     }
   };
 
+  auto sdlMouseButtonToInputID =
+    [](uint8_t button)
+  {
+    switch (button) {
+      default:                return InputID::NUM_IDS;
+      case SDL_BUTTON_LEFT:   return InputID::MouseLeft;
+      case SDL_BUTTON_MIDDLE: return InputID::MouseMiddle;
+      case SDL_BUTTON_RIGHT:  return InputID::MouseRight;
+      case SDL_BUTTON_X1:     return InputID::Mouse4;
+      case SDL_BUTTON_X2:     return InputID::Mouse5;
+    }
+  };
+
   static std::array<SDL_Event, 1024> events;
 
   SDL_PumpEvents();
@@ -467,33 +479,39 @@ bool UIBackend::processEvents()
           userInput.mouse_pos_ = { e.motion.x, e.motion.y };
         } break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-          InputID id = InputID((u32)InputID::MouseLeft + e.button.button);
+          InputID id = sdlMouseButtonToInputID(e.button.button);
           updateInputState(id, e.button.state == SDL_PRESSED);
           updateInputEvent(id, true);
-
-          if (e.button.clicks > 1) {
-            userInput.double_clicks_ |= 1 << (i32)id;
-          }
         } break;
         case SDL_EVENT_MOUSE_BUTTON_UP: {
-          InputID id = InputID((u32)InputID::MouseLeft + e.button.button);
+          InputID id = sdlMouseButtonToInputID(e.button.button);
           updateInputState(id, e.button.state == SDL_PRESSED);
           updateInputEvent(id, false);
         } break;
         case SDL_EVENT_KEY_DOWN: {
-          InputID id = keyToInputID(e.key.key);
+          if (!getPlatformWindow(e.key.windowID)) {
+            break;
+          }
+
+          InputID id = sdlKeyToInputID(e.key.key);
           if (id == InputID::NUM_IDS) {
             break;
           }
-          updateInputState(id, e.button.state == SDL_PRESSED);
+
+          updateInputState(id, e.key.state == SDL_PRESSED);
           updateInputEvent(id, false);
         } break;
         case SDL_EVENT_KEY_UP: {
-          InputID id = keyToInputID(e.key.key);
+          if (!getPlatformWindow(e.key.windowID)) {
+            break;
+          }
+
+          InputID id = sdlKeyToInputID(e.key.key);
           if (id == InputID::NUM_IDS) {
             break;
           }
-          updateInputState(id, e.button.state == SDL_PRESSED);
+
+          updateInputState(id, e.key.state == SDL_PRESSED);
           updateInputEvent(id, true);
         } break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED: {
