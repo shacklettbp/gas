@@ -45,6 +45,7 @@ RasterShader loadShader(GPURuntime *gpu,
     .fragmentEntry = "fragMain",
     .rasterPass = raster_pass,
     .paramBlockTypes = { param_block_type },
+    .numPerDrawBytes = sizeof(VertexTransform),
     .vertexBuffers = {{ 
       .stride = sizeof(ImDrawVert), .attributes = {
         { .offset = offsetof(ImDrawVert, pos), .format = Vec2_F32 },
@@ -52,7 +53,6 @@ RasterShader loadShader(GPURuntime *gpu,
         { .offset = offsetof(ImDrawVert, col), .format = Vec4_UNorm8 },
       }
     }},
-    .numPerDrawBytes = sizeof(VertexTransform),
     .rasterConfig = {
       .cullMode = CullMode::None,
       .blending = { BlendingConfig::additiveDefault() },

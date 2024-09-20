@@ -378,6 +378,7 @@ struct VertexBufferConfig {
 
 enum class DepthCompare : u16 {
   GreaterOrEqual,
+  LessOrEqual,
   Disabled,
 };
 
@@ -430,8 +431,8 @@ struct RasterShaderInit {
   const char *fragmentEntry;
   RasterPassInterfaceID rasterPass;
   Span<const ParamBlockTypeID> paramBlockTypes = {};
-  Span<const VertexBufferConfig> vertexBuffers = {};
   uint32_t numPerDrawBytes = 0;
+  Span<const VertexBufferConfig> vertexBuffers = {};
   RasterHWConfig rasterConfig = {};
 };
 

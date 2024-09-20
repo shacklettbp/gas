@@ -171,10 +171,11 @@ inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
 
   switch (in) {
     case GreaterOrEqual: return O::GreaterEqual;
+    case LessOrEqual: return O::LessEqual;
     case Disabled: return O::Never;
     default: MADRONA_UNREACHABLE();
   }
-};
+}
 
 inline wgpu::CullMode convertCullMode(CullMode in)
 {
