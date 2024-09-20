@@ -355,7 +355,10 @@ void UIBackend::enableRawMouseInput(Window *window_base)
   PlatformWindow *window = (PlatformWindow *)window_base;
 #ifdef GAS_USE_SDL
   SDL_Window *sdl_hdl = window->os.sdl;
-  REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, SDL_TRUE));
+
+  if (!SDL_GetWindowRelativeMouseMode(sdl_hdl)) {
+    REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, true));
+  }
 #endif
 }
 
@@ -364,7 +367,10 @@ void UIBackend::disableRawMouseInput(Window *window_base)
   PlatformWindow *window = (PlatformWindow *)window_base;
 #ifdef GAS_USE_SDL
   SDL_Window *sdl_hdl = window->os.sdl;
-  REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, SDL_FALSE));
+
+  if (SDL_GetWindowRelativeMouseMode(sdl_hdl)) {
+    REQ_SDL(SDL_SetWindowRelativeMouseMode(sdl_hdl, false));
+  }
 #endif
 }
 
@@ -373,6 +379,7 @@ bool UIBackend::processEvents()
   bool should_quit = false;
 
   userInput.events_.clear();
+  userInput.mouse_delta_ = { 0, 0 };
 
   auto updateInputEvent =
     [this]
@@ -510,19 +517,21 @@ bool UIBackend::processEvents()
           }
 
           userInput.mouse_pos_ = { e.motion.x, e.motion.y };
+          userInput.mouse_delta_ = { e.motion.xrel, e.motion.yrel };
 #ifdef SDL_PLATFORM_MACOS
           // macOS reports mouse in half pixel coords for hidpi displays
           userInput.mouse_pos_ *= 2.f;
+          userInput.mouse_delta_ *= 2.f;
 #endif
         } break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
           InputID id = sdlMouseButtonToInputID(e.button.button);
-          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputState(id, e.button.down);
           updateInputEvent(id, true);
         } break;
         case SDL_EVENT_MOUSE_BUTTON_UP: {
           InputID id = sdlMouseButtonToInputID(e.button.button);
-          updateInputState(id, e.button.state == SDL_PRESSED);
+          updateInputState(id, e.button.down);
           updateInputEvent(id, false);
         } break;
         case SDL_EVENT_KEY_DOWN: {
@@ -535,7 +544,7 @@ bool UIBackend::processEvents()
             break;
           }
 
-          updateInputState(id, e.key.state == SDL_PRESSED);
+          updateInputState(id, e.key.down);
           updateInputEvent(id, false);
         } break;
         case SDL_EVENT_KEY_UP: {
@@ -548,7 +557,7 @@ bool UIBackend::processEvents()
             break;
           }
 
-          updateInputState(id, e.key.state == SDL_PRESSED);
+          updateInputState(id, e.key.down);
           updateInputEvent(id, true);
         } break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED: {

@@ -5,6 +5,11 @@ Vector2 UserInput::mousePosition() const
   return mouse_pos_;
 }
 
+Vector2 UserInput::mouseDelta() const
+{
+  return mouse_delta_;
+}
+
 bool UserInputEvents::downEvent(InputID id) const
 {
   i32 id_idx = (i32)id / 16;

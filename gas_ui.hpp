@@ -53,6 +53,7 @@ friend struct UIBackend;
 class UserInput {
 public:
   inline Vector2 mousePosition() const;
+  inline Vector2 mouseDelta() const;
 
   inline bool isDown(InputID id) const;
   inline bool isUp(InputID id) const;
@@ -67,6 +68,7 @@ private:
       utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
 
   Vector2 mouse_pos_;
+  Vector2 mouse_delta_;
 
   std::array<u32, NUM_BITFIELDS> states_;
   UserInputEvents events_;

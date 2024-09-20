@@ -172,7 +172,7 @@ inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
   switch (in) {
     case GreaterOrEqual: return O::GreaterEqual;
     case LessOrEqual: return O::LessEqual;
-    case Disabled: return O::Never;
+    case Disabled: return O::Always;
     default: MADRONA_UNREACHABLE();
   }
 }

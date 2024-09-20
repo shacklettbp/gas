@@ -54,6 +54,8 @@ RasterShader loadShader(GPURuntime *gpu,
       }
     }},
     .rasterConfig = {
+      .depthCompare = DepthCompare::Disabled,
+      .writeDepth = false,
       .cullMode = CullMode::None,
       .blending = { BlendingConfig::additiveDefault() },
     },

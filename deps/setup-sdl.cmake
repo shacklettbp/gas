@@ -9,7 +9,7 @@ set(SDL_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/sdl-build-config-hash")
 function(fetch_build_sdl)
   FetchContent_Populate(sdl-bundled
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG 9ff3446f036094bc005ef119e0cf07fc9b503b8e 
+    GIT_TAG 89c6bc5f5022e71433a9e4eb1a2edc6d79be71f2
     GIT_PROGRESS ON
     SOURCE_DIR "${SDL_SRC_DIR}"
   )
