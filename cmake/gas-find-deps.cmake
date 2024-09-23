@@ -19,7 +19,11 @@ function(find_sdl)
   get_target_property(SDL_IMPLIB SDL3::SDL3-shared IMPORTED_IMPLIB_RELEASE)
   get_target_property(SDL_IN_LOC SDL3::SDL3-shared IMPORTED_LOCATION_RELEASE)
 
-  cmake_path(GET SDL_IN_LOC FILENAME SDL_LIB_NAME)
+  if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    get_target_property(SDL_LIB_NAME SDL3::SDL3-shared IMPORTED_SONAME_RELEASE)
+  else ()
+    cmake_path(GET SDL_IN_LOC FILENAME SDL_LIB_NAME)
+  endif ()
 
   set(SDL_OUT_LOC "${DEP_LIB_OUT_DIR}/${SDL_LIB_NAME}")
   
