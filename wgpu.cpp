@@ -1565,9 +1565,11 @@ void Backend::createRasterShaders(i32 num_shaders,
     assert(raster_cfg.blending.size() == 0 ||
       raster_cfg.blending.size() == pass_cfg->numColorAttachments);
 
+    wgpu::BlendState blend_states[MAX_COLOR_ATTACHMENTS];
+
     for (i32 i = 0; i < raster_cfg.blending.size(); i++) {
       BlendingConfig blend_cfg = raster_cfg.blending[i];
-      wgpu::BlendState blend_out;
+      wgpu::BlendState &blend_out = blend_states[i];
       blend_out.color.operation = convertBlendOp(blend_cfg.colorOp);
       blend_out.color.srcFactor = convertBlendFactor(blend_cfg.srcColorFactor);
       blend_out.color.dstFactor = convertBlendFactor(blend_cfg.dstColorFactor);
