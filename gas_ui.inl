@@ -10,20 +10,6 @@ Vector2 UserInput::mouseDelta() const
   return mouse_delta_;
 }
 
-bool UserInputEvents::downEvent(InputID id) const
-{
-  i32 id_idx = (i32)id / 16;
-  i32 id_bit = (i32)id % 16;
-  return (events_[id_idx] & (1 << (2 * id_bit))) != 0;
-}
-
-bool UserInputEvents::upEvent(InputID id) const
-{
-  i32 id_idx = (i32)id / 16;
-  i32 id_bit = (i32)id % 16;
-  return (events_[id_idx] & (1 << (2 * id_bit + 1))) != 0;
-}
-
 bool UserInput::isDown(InputID id) const
 {
   i32 id_idx = (i32)id / 32;
@@ -38,19 +24,18 @@ bool UserInput::isUp(InputID id) const
   return (states_[id_idx] & (1 << id_bit)) == 0;
 }
 
-bool UserInput::downEvent(InputID id) const
+bool UserInputEvents::downEvent(InputID id) const
 {
-  return events_.downEvent(id);
+  i32 id_idx = (i32)id / 16;
+  i32 id_bit = (i32)id % 16;
+  return (events_[id_idx] & (1 << (2 * id_bit))) != 0;
 }
 
-bool UserInput::upEvent(InputID id) const
+bool UserInputEvents::upEvent(InputID id) const
 {
-  return events_.upEvent(id);
-}
-
-const UserInputEvents & UserInput::events() const
-{
-  return events_;
+  i32 id_idx = (i32)id / 16;
+  i32 id_bit = (i32)id % 16;
+  return (events_[id_idx] & (1 << (2 * id_bit + 1))) != 0;
 }
 
 inline WindowState & operator|=(WindowState &a, WindowState b)

@@ -33,6 +33,26 @@ enum class InputID : u32 {
   NUM_IDS,
 };
 
+class UserInput {
+public:
+  inline Vector2 mousePosition() const;
+  inline Vector2 mouseDelta() const;
+
+  inline bool isDown(InputID id) const;
+  inline bool isUp(InputID id) const;
+
+private:
+  static constexpr inline u32 NUM_BITFIELDS =
+      utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
+
+  Vector2 mouse_pos_;
+  Vector2 mouse_delta_;
+
+  std::array<u32, NUM_BITFIELDS> states_;
+
+friend struct UIBackend;
+};
+
 class UserInputEvents {
 public:
   inline bool downEvent(InputID id) const;
@@ -46,32 +66,6 @@ private:
       2 * utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
 
   std::array<u32, NUM_BITFIELDS> events_;
-
-friend struct UIBackend;
-};
-
-class UserInput {
-public:
-  inline Vector2 mousePosition() const;
-  inline Vector2 mouseDelta() const;
-
-  inline bool isDown(InputID id) const;
-  inline bool isUp(InputID id) const;
-
-  inline bool downEvent(InputID id) const;
-  inline bool upEvent(InputID id) const;
-
-  inline const UserInputEvents & events() const;
-
-private:
-  static constexpr inline u32 NUM_BITFIELDS =
-      utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
-
-  Vector2 mouse_pos_;
-  Vector2 mouse_delta_;
-
-  std::array<u32, NUM_BITFIELDS> states_;
-  UserInputEvents events_;
 
 friend struct UIBackend;
 };
@@ -107,6 +101,7 @@ public:
   bool processEvents();
 
   UserInput & inputState();
+  UserInputEvents & inputEvents();
 
   GPUAPI * gpuAPI();
 };

@@ -211,7 +211,8 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
 {
   float pixels_to_ui = 1.f / ui_scale;
 
-  UserInput &input = ui_sys->inputState();
+  UserInput &cur_input = ui_sys->inputState();
+  UserInputEvents &events = ui_sys->inputEvents();
   Window *window = ui_sys->getMainWindow();
 
   ImGuiIO &io = ImGui::GetIO();
@@ -225,7 +226,7 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
 
   io.DeltaTime = delta_t;
 
-  Vector2 mouse_pos = input.mousePosition();
+  Vector2 mouse_pos = cur_input.mousePosition();
 
   io.AddMousePosEvent(mouse_pos.x * pixels_to_ui,
                       mouse_pos.y * pixels_to_ui);
@@ -233,18 +234,18 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
   for (int i = 0; i < 5; i++) {
     InputID id = InputID((u32)InputID::MouseLeft + (u32)i);
 
-    if (input.isDown(id)) {
-      if (input.upEvent(id)) {
+    if (cur_input.isDown(id)) {
+      if (events.upEvent(id)) {
         io.AddMouseButtonEvent(i, false);
         io.AddMouseButtonEvent(i, true);
-      } else if (input.downEvent(id)) {
+      } else if (events.downEvent(id)) {
         io.AddMouseButtonEvent(i, true);
       }
     } else {
-      if (input.downEvent(id)) {
+      if (events.downEvent(id)) {
         io.AddMouseButtonEvent(i, true);
         io.AddMouseButtonEvent(i, false);
-      } else if (input.upEvent(id)) {
+      } else if (events.upEvent(id)) {
         io.AddMouseButtonEvent(i, false);
       }
     }

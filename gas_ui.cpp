@@ -57,7 +57,8 @@ struct UIBackend : public UISystem {
   SDL_WindowID mainWindowID;
 #endif
 
-  UserInput userInput;
+  UserInput inputState;
+  UserInputEvents inputEvents;
 
   inline void shutdown();
 
@@ -155,7 +156,8 @@ UISystem * UISystem::init(const Config &cfg)
 #ifdef GAS_USE_SDL
     .mainWindowID = {},
 #endif
-    .userInput = {},
+    .inputState = {},
+    .inputEvents = {},
   };
 }
 
@@ -378,8 +380,8 @@ bool UIBackend::processEvents()
 {
   bool should_quit = false;
 
-  userInput.events_.clear();
-  userInput.mouse_delta_ = { 0, 0 };
+  inputEvents.clear();
+  inputState.mouse_delta_ = { 0, 0 };
 
   auto updateInputEvent =
     [this]
@@ -389,9 +391,9 @@ bool UIBackend::processEvents()
     i32 event_bit = (i32)id % 16;
 
     if (down) {
-      userInput.events_.events_[event_idx] |= (1 << (2 * event_bit));
+      inputEvents.events_[event_idx] |= (1 << (2 * event_bit));
     } else {
-      userInput.events_.events_[event_idx] |= (1 << (2 * event_bit + 1));
+      inputEvents.events_[event_idx] |= (1 << (2 * event_bit + 1));
     }
   };
 
@@ -403,9 +405,9 @@ bool UIBackend::processEvents()
     i32 state_bit = (i32)id % 32;
 
     if (down) {
-      userInput.states_[state_idx] |= (1 << state_bit);
+      inputState.states_[state_idx] |= (1 << state_bit);
     } else {
-      userInput.states_[state_idx] &= ~(1 << state_bit);
+      inputState.states_[state_idx] &= ~(1 << state_bit);
     }
   };
 
@@ -516,12 +518,12 @@ bool UIBackend::processEvents()
             break;
           }
 
-          userInput.mouse_pos_ = { e.motion.x, e.motion.y };
-          userInput.mouse_delta_ = { e.motion.xrel, e.motion.yrel };
+          inputState.mouse_pos_ = { e.motion.x, e.motion.y };
+          inputState.mouse_delta_ = { e.motion.xrel, e.motion.yrel };
 #ifdef SDL_PLATFORM_MACOS
           // macOS reports mouse in half pixel coords for hidpi displays
-          userInput.mouse_pos_ *= 2.f;
-          userInput.mouse_delta_ *= 2.f;
+          inputState.mouse_pos_ *= 2.f;
+          inputState.mouse_delta_ *= 2.f;
 #endif
         } break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
@@ -648,7 +650,12 @@ bool UISystem::processEvents()
 
 UserInput & UISystem::inputState()
 {
-  return backend(this)->userInput;
+  return backend(this)->inputState;
+}
+
+UserInputEvents & UISystem::inputEvents()
+{
+  return backend(this)->inputEvents;
 }
 
 GPUAPI * UISystem::gpuAPI()
