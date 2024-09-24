@@ -153,7 +153,7 @@ void GPURuntime::deallocCommandBlocks(FrontendCommands *cmds)
 {
   while (cmds != nullptr) {
     FrontendCommands *next = cmds->next;
-    rawDealloc(next);
+    rawDealloc(cmds);
     cmds = next;
   }
 }

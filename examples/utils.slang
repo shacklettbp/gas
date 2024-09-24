@@ -1,5 +1,7 @@
-public float4 worldToClip(float3x4 w2c, float3 pos_w, float z_near)
+public float4 worldToClip(float3x4 w2c, float3 pos_w)
 {
+  const float z_near = 0.001;
+
   return float4(
     dot(pos_w, w2c[0].xyz) + w2c[0].w,
     dot(pos_w, w2c[1].xyz) + w2c[1].w,
