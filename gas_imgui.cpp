@@ -117,6 +117,54 @@ void unloadFonts(GPURuntime *gpu)
   io.Fonts->ClearFonts();
 }
 
+ImGuiKey inputIDKeyToImGuiKey(InputID id)
+{
+  using enum InputID;
+
+  switch (id) {
+    case A: return ImGuiKey_A;
+    case B: return ImGuiKey_B;
+    case C: return ImGuiKey_C;
+    case D: return ImGuiKey_D;
+    case E: return ImGuiKey_E;
+    case F: return ImGuiKey_F;
+    case G: return ImGuiKey_G;
+    case H: return ImGuiKey_H;
+    case I: return ImGuiKey_I;
+    case J: return ImGuiKey_J;
+    case K: return ImGuiKey_K;
+    case L: return ImGuiKey_L;
+    case M: return ImGuiKey_M;
+    case N: return ImGuiKey_N;
+    case O: return ImGuiKey_O;
+    case P: return ImGuiKey_P;
+    case Q: return ImGuiKey_Q;
+    case R: return ImGuiKey_R;
+    case S: return ImGuiKey_S;
+    case T: return ImGuiKey_T;
+    case U: return ImGuiKey_U;
+    case V: return ImGuiKey_V;
+    case W: return ImGuiKey_W;
+    case X: return ImGuiKey_X;
+    case Y: return ImGuiKey_Y;
+    case Z: return ImGuiKey_Z;
+    case K1: return ImGuiKey_1;
+    case K2: return ImGuiKey_2;
+    case K3: return ImGuiKey_3;
+    case K4: return ImGuiKey_4;
+    case K5: return ImGuiKey_5;
+    case K6: return ImGuiKey_6;
+    case K7: return ImGuiKey_7;
+    case K8: return ImGuiKey_8;
+    case K9: return ImGuiKey_9;
+    case K0: return ImGuiKey_0;
+    case Shift: return ImGuiKey_LeftShift;
+    case Space: return ImGuiKey_Space;
+    case BackSpace: return ImGuiKey_Backspace;
+    default: return ImGuiKey_None;
+  }
+}
+
 }
 
 namespace ImGuiSystem {
@@ -231,7 +279,7 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
   io.AddMousePosEvent(mouse_pos.x * pixels_to_ui,
                       mouse_pos.y * pixels_to_ui);
 
-  for (int i = 0; i < 5; i++) {
+  for (i32 i = 0; i < 5; i++) {
     InputID id = InputID((u32)InputID::MouseLeft + (u32)i);
 
     if (cur_input.isDown(id)) {
@@ -253,6 +301,28 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
 
   io.AddFocusEvent((window->state & WindowState::IsFocused) != 
                    WindowState::None);
+
+  for (InputID id = InputID::A; id != InputID::NUM_IDS;
+       id = InputID((u32)id + 1)) {
+    ImGuiKey key = inputIDKeyToImGuiKey(id);
+    assert(key != ImGuiKey_None);
+
+    if (cur_input.isDown(id)) {
+      if (events.upEvent(id)) {
+        io.AddKeyEvent(key, false);
+        io.AddKeyEvent(key, true);
+      } else if (events.downEvent(id)) {
+        io.AddKeyEvent(key, true);
+      }
+    } else {
+      if (events.downEvent(id)) {
+        io.AddKeyEvent(key, true);
+        io.AddKeyEvent(key, false);
+      } else if (events.upEvent(id)) {
+        io.AddKeyEvent(key, false);
+      }
+    }
+  }
 
   ImGui::NewFrame();
 }

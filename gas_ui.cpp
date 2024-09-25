@@ -435,46 +435,47 @@ bool UIBackend::processEvents()
   (SDL_Keycode key) -> InputID
   {
     switch (key) {
-      default:          return InputID::NUM_IDS;
-      case SDLK_A:      return InputID::A;
-      case SDLK_B:      return InputID::B;
-      case SDLK_C:      return InputID::C;
-      case SDLK_D:      return InputID::D;
-      case SDLK_E:      return InputID::E;
-      case SDLK_F:      return InputID::F;
-      case SDLK_G:      return InputID::G;
-      case SDLK_H:      return InputID::H;
-      case SDLK_I:      return InputID::I;
-      case SDLK_J:      return InputID::J;
-      case SDLK_K:      return InputID::K;
-      case SDLK_L:      return InputID::L;
-      case SDLK_M:      return InputID::M;
-      case SDLK_N:      return InputID::N;
-      case SDLK_O:      return InputID::O;
-      case SDLK_P:      return InputID::P;
-      case SDLK_Q:      return InputID::Q;
-      case SDLK_R:      return InputID::S;
-      case SDLK_S:      return InputID::S;
-      case SDLK_T:      return InputID::T;
-      case SDLK_U:      return InputID::U;
-      case SDLK_V:      return InputID::V;
-      case SDLK_W:      return InputID::W;
-      case SDLK_X:      return InputID::X;
-      case SDLK_Y:      return InputID::Y;
-      case SDLK_Z:      return InputID::Z;
-      case SDLK_0:      return InputID::K0;
-      case SDLK_1:      return InputID::K1;
-      case SDLK_2:      return InputID::K2;
-      case SDLK_3:      return InputID::K3;
-      case SDLK_4:      return InputID::K4;
-      case SDLK_5:      return InputID::K5;
-      case SDLK_6:      return InputID::K6;
-      case SDLK_7:      return InputID::K7;
-      case SDLK_8:      return InputID::K8;
-      case SDLK_9:      return InputID::K9;
-      case SDLK_SPACE:  return InputID::Space;
-      case SDLK_LSHIFT: return InputID::Shift;
-      case SDLK_RSHIFT: return InputID::Shift;
+      default:             return InputID::NUM_IDS;
+      case SDLK_A:         return InputID::A;
+      case SDLK_B:         return InputID::B;
+      case SDLK_C:         return InputID::C;
+      case SDLK_D:         return InputID::D;
+      case SDLK_E:         return InputID::E;
+      case SDLK_F:         return InputID::F;
+      case SDLK_G:         return InputID::G;
+      case SDLK_H:         return InputID::H;
+      case SDLK_I:         return InputID::I;
+      case SDLK_J:         return InputID::J;
+      case SDLK_K:         return InputID::K;
+      case SDLK_L:         return InputID::L;
+      case SDLK_M:         return InputID::M;
+      case SDLK_N:         return InputID::N;
+      case SDLK_O:         return InputID::O;
+      case SDLK_P:         return InputID::P;
+      case SDLK_Q:         return InputID::Q;
+      case SDLK_R:         return InputID::S;
+      case SDLK_S:         return InputID::S;
+      case SDLK_T:         return InputID::T;
+      case SDLK_U:         return InputID::U;
+      case SDLK_V:         return InputID::V;
+      case SDLK_W:         return InputID::W;
+      case SDLK_X:         return InputID::X;
+      case SDLK_Y:         return InputID::Y;
+      case SDLK_Z:         return InputID::Z;
+      case SDLK_0:         return InputID::K0;
+      case SDLK_1:         return InputID::K1;
+      case SDLK_2:         return InputID::K2;
+      case SDLK_3:         return InputID::K3;
+      case SDLK_4:         return InputID::K4;
+      case SDLK_5:         return InputID::K5;
+      case SDLK_6:         return InputID::K6;
+      case SDLK_7:         return InputID::K7;
+      case SDLK_8:         return InputID::K8;
+      case SDLK_9:         return InputID::K9;
+      case SDLK_LSHIFT:    return InputID::Shift;
+      case SDLK_RSHIFT:    return InputID::Shift;
+      case SDLK_SPACE:     return InputID::Space;
+      case SDLK_BACKSPACE: return InputID::BackSpace;
     }
   };
 
@@ -547,7 +548,7 @@ bool UIBackend::processEvents()
           }
 
           updateInputState(id, e.key.down);
-          updateInputEvent(id, false);
+          updateInputEvent(id, true);
         } break;
         case SDL_EVENT_KEY_UP: {
           if (!getPlatformWindow(e.key.windowID)) {
@@ -560,7 +561,7 @@ bool UIBackend::processEvents()
           }
 
           updateInputState(id, e.key.down);
-          updateInputEvent(id, true);
+          updateInputEvent(id, false);
         } break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED: {
           PlatformWindow *window = getPlatformWindow(e.motion.windowID);
