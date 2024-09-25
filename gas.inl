@@ -816,6 +816,11 @@ GPUQueue GPURuntime::getMainQueue()
   return GPUQueue { 0 };
 }
 
+GPUQueue GPURuntime::getUploadQueue()
+{
+  return GPUQueue { 1 };
+}
+
 CommandEncoder GPURuntime::createCommandEncoder(GPUQueue queue)
 {
   return CommandEncoder(this, queue);

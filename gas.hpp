@@ -860,6 +860,7 @@ public:
 
   // ==== Command recording & submission ======================================
   inline GPUQueue getMainQueue();
+  inline GPUQueue getUploadQueue();
   
   inline CommandEncoder createCommandEncoder(GPUQueue queue);
   inline void destroyCommandEncoder(CommandEncoder &encoder);
