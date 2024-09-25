@@ -98,10 +98,14 @@ public:
   void enableRawMouseInput(Window *window);
   void disableRawMouseInput(Window *window);
 
+  void beginTextEntry(Window *window, Vector2 pos, float line_height);
+  void endTextEntry(Window *window);
+
   bool processEvents();
 
   UserInput & inputState();
   UserInputEvents & inputEvents();
+  const char * inputText();
 
   GPUAPI * gpuAPI();
 };

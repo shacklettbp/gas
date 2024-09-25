@@ -60,6 +60,8 @@ struct UIBackend : public UISystem {
   UserInput inputState;
   UserInputEvents inputEvents;
 
+  const char * inputText;
+
   inline void shutdown();
 
   inline Window * createWindow(const char *title,
@@ -75,6 +77,10 @@ struct UIBackend : public UISystem {
 
   inline void enableRawMouseInput(Window *window_base);
   inline void disableRawMouseInput(Window *window_base);
+
+  inline void beginTextEntry(
+      Window *window_base, Vector2 pos, float line_height);
+  inline void endTextEntry(Window *window_base);
 
   inline bool processEvents();
 };
@@ -158,6 +164,7 @@ UISystem * UISystem::init(const Config &cfg)
 #endif
     .inputState = {},
     .inputEvents = {},
+    .inputText = nullptr,
   };
 }
 
@@ -376,12 +383,44 @@ void UIBackend::disableRawMouseInput(Window *window_base)
 #endif
 }
 
+
+void UIBackend::beginTextEntry(
+    Window *window_base, Vector2 pos, float line_height)
+{
+  PlatformWindow *window = (PlatformWindow *)window_base;
+#ifdef GAS_USE_SDL
+  SDL_Window *sdl_hdl = window->os.sdl;
+
+  SDL_Rect r;
+  r.x = pos.x;
+  r.y = pos.y;
+  r.w = 1;
+  r.h = line_height;
+
+  REQ_SDL(SDL_SetTextInputArea(sdl_hdl, &r, 0));
+  if (!SDL_TextInputActive(sdl_hdl)) {
+    REQ_SDL(SDL_StartTextInput(sdl_hdl));
+  }
+#endif
+}
+
+void UIBackend::endTextEntry(Window *window_base)
+{
+  PlatformWindow *window = (PlatformWindow *)window_base;
+#ifdef GAS_USE_SDL
+  SDL_Window *sdl_hdl = window->os.sdl;
+  assert(SDL_TextInputActive(sdl_hdl));
+  REQ_SDL(SDL_StopTextInput(sdl_hdl));
+#endif
+}
+
 bool UIBackend::processEvents()
 {
   bool should_quit = false;
 
   inputEvents.clear();
   inputState.mouse_delta_ = { 0, 0 };
+  inputText = nullptr;
 
   auto updateInputEvent =
     [this]
@@ -538,7 +577,8 @@ bool UIBackend::processEvents()
           updateInputEvent(id, false);
         } break;
         case SDL_EVENT_KEY_DOWN: {
-          if (!getPlatformWindow(e.key.windowID)) {
+          PlatformWindow *window = getPlatformWindow(e.key.windowID);
+          if (!window || SDL_TextInputActive(window->os.sdl)) {
             break;
           }
 
@@ -551,7 +591,8 @@ bool UIBackend::processEvents()
           updateInputEvent(id, true);
         } break;
         case SDL_EVENT_KEY_UP: {
-          if (!getPlatformWindow(e.key.windowID)) {
+          PlatformWindow *window = getPlatformWindow(e.key.windowID);
+          if (!window || SDL_TextInputActive(window->os.sdl)) {
             break;
           }
 
@@ -562,6 +603,13 @@ bool UIBackend::processEvents()
 
           updateInputState(id, e.key.down);
           updateInputEvent(id, false);
+        } break;
+        case SDL_EVENT_TEXT_INPUT: {
+          if (!getPlatformWindow(e.text.windowID)) {
+            break;
+          }
+
+          inputText = e.text.text;
         } break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED: {
           PlatformWindow *window = getPlatformWindow(e.motion.windowID);
@@ -644,6 +692,17 @@ void UISystem::disableRawMouseInput(Window *window)
   backend(this)->disableRawMouseInput(window);
 }
 
+void UISystem::beginTextEntry(
+    Window *window, Vector2 pos, float line_height)
+{
+  backend(this)->beginTextEntry(window, pos, line_height);
+}
+
+void UISystem::endTextEntry(Window *window)
+{
+  backend(this)->endTextEntry(window);
+}
+
 bool UISystem::processEvents()
 {
   return backend(this)->processEvents();
@@ -657,6 +716,11 @@ UserInput & UISystem::inputState()
 UserInputEvents & UISystem::inputEvents()
 {
   return backend(this)->inputEvents;
+}
+
+const char * UISystem::inputText()
+{
+  return backend(this)->inputText;
 }
 
 GPUAPI * UISystem::gpuAPI()

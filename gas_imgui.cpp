@@ -12,6 +12,8 @@ struct VertexTransform {
 };
 
 struct ImGuiBackend {
+  UISystem *uiSys;
+
   ParamBlockType paramBlockType;
   RasterShader shader;
   Sampler fontSampler;
@@ -195,19 +197,7 @@ void init(UISystem *ui_sys,
   io.BackendRendererName = "gas";
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-  platform_io.Platform_SetClipboardTextFn =
-    [](ImGuiContext *, const char *text)
-  {
-    // Set clipboard text
-    (void)text;
-  };
-
-  platform_io.Platform_GetClipboardTextFn =
-    [](ImGuiContext *)
-  { 
-    return "";
-  };
+  bd->uiSys = ui_sys;
 
   bd->paramBlockType = gpu->createParamBlockType({
     .uuid = "imgui_param_block"_to_uuid,
@@ -228,6 +218,36 @@ void init(UISystem *ui_sys,
   });
 
   loadFonts(gpu, tx_queue, font_path, font_size);
+
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  platform_io.Platform_SetClipboardTextFn =
+    [](ImGuiContext *, const char *text)
+  {
+    // Set clipboard text
+    (void)text;
+  };
+
+  platform_io.Platform_GetClipboardTextFn =
+    [](ImGuiContext *)
+  { 
+    return "";
+  };
+
+  platform_io.Platform_SetImeDataFn =
+    []
+  (ImGuiContext *, ImGuiViewport *, ImGuiPlatformImeData *data)
+  {
+    ImGuiIO &io = ImGui::GetIO();
+    ImGuiBackend *bd = (ImGuiBackend *)io.BackendPlatformUserData;
+    UISystem *ui_sys = bd->uiSys;
+
+    if (data->WantVisible) {
+      ui_sys->beginTextEntry(ui_sys->getMainWindow(),
+          { data->InputPos.x, data->InputPos.y }, data->InputLineHeight);
+    } else {
+      ui_sys->endTextEntry(ui_sys->getMainWindow());
+    }
+  };
 }
 
 void shutdown(GPURuntime *gpu)
@@ -322,6 +342,10 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
         io.AddKeyEvent(key, false);
       }
     }
+  }
+
+  if (ui_sys->inputText()) {
+    io.AddInputCharactersUTF8(ui_sys->inputText());
   }
 
   ImGui::NewFrame();
