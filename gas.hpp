@@ -81,11 +81,6 @@ struct ComputeShader : GenHandle<ComputeShader> {
   u16 id = 0;
 };
 
-struct ResourceAlloc : GenHandle<ResourceAlloc> {
-  u16 gen = 0;
-  u16 id = 0;
-};
-
 struct BackendHandle {
   union {
     void *ptr;
