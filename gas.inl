@@ -121,9 +121,9 @@ void CommandWriter::ctrl(GPURuntime *gpu, CommandCtrl ctrl)
   writeU32(gpu, (u32)ctrl);
 }
 
-u32 GPUTmpInputBlock::alloc(u32 num_bytes)
+u32 GPUTmpInputBlock::alloc(u32 num_bytes, u32 alignment)
 {
-  u32 start = utils::roundUpPow2(offset, 256);
+  u32 start = utils::roundUp(offset, alignment);
   offset = start + num_bytes;
   return start;
 }
@@ -205,7 +205,7 @@ void RasterPassEncoder::setIndexBufferU16(Buffer buffer)
   state_.indexBuffer = buffer;
 }
 
-MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
+MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 {
   if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) [[unlikely]] {
     return MappedTmpBuffer {
@@ -215,7 +215,7 @@ MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
     };
   }
 
-  u32 offset = allocGPUTmpInput(num_bytes);
+  u32 offset = allocGPUTmpInput(num_bytes, alignment);
 
   return MappedTmpBuffer {
     .buffer = gpu_input_.buffer,
@@ -226,7 +226,7 @@ MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes)
 
 void * RasterPassEncoder::drawData(u32 num_bytes)
 {
-  u32 offset = allocGPUTmpInput(num_bytes);
+  u32 offset = allocGPUTmpInput(num_bytes, 256);
 
   ctrl_ |= CommandCtrl::DrawDataOffset;
   state_.dataOffset = offset;
@@ -234,9 +234,9 @@ void * RasterPassEncoder::drawData(u32 num_bytes)
   return gpu_input_.ptr + offset;
 }
 
-u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes)
+u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes, u32 alignment)
 {
-  u32 offset = gpu_input_.alloc(num_bytes);
+  u32 offset = gpu_input_.alloc(num_bytes, alignment);
   if (gpu_input_.blockFull()) [[unlikely]] {
     gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
 
@@ -253,8 +253,8 @@ u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes)
       state_.dataBuffer = gpu_input_.buffer;
     }
 
-    offset = gpu_input_.offset;
-    gpu_input_.offset += num_bytes;
+    offset = utils::roundUp(gpu_input_.offset, alignment);
+    gpu_input_.offset = offset + num_bytes;
   }
 
   return offset;
@@ -559,7 +559,7 @@ void CopyPassEncoder::clearBuffer(Buffer buffer, u32 offset, u32 num_bytes)
   ctrl_ = None;
 }
 
-MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes)
+MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 {
   if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) [[unlikely]] {
     return MappedTmpBuffer {
@@ -569,12 +569,12 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes)
     };
   }
 
-  u32 offset = gpu_input_.alloc(num_bytes);
+  u32 offset = gpu_input_.alloc(num_bytes, alignment);
   if (gpu_input_.blockFull()) [[unlikely]] {
     gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
 
-    offset = gpu_input_.offset;
-    gpu_input_.offset += num_bytes;
+    offset = utils::roundUp(gpu_input_.offset, alignment);
+    gpu_input_.offset = offset + num_bytes;
   }
 
   return MappedTmpBuffer {

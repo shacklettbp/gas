@@ -719,7 +719,7 @@ void Backend::createGPUResources(i32 num_buffers,
     // FIXME move to validation
     assert(tx_queue.id != -1);
 
-    u32 offset = staging_block.alloc(num_bytes);
+    u32 offset = staging_block.alloc(num_bytes, 4);
     if (staging_block.blockFull()) {
       staging_block = allocGPUTmpInputBlock(tx_queue);
       staging_block.offset += num_bytes;

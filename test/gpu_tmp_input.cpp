@@ -108,11 +108,11 @@ TEST_F(GPUTmpInput, MultiRasterPass)
     u8 *base;
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp0);
-      base = raster_enc.tmpBuffer(1).ptr;
+      base = raster_enc.tmpBuffer(1, 256).ptr;
 
       raster_enc.setShader(shader_);
       raster_enc.drawData(Vector3 { 1, 1, 0 });
-      u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
+      u8 *post_draw_data = raster_enc.tmpBuffer(1, 256).ptr;
       EXPECT_EQ(post_draw_data - base, 512);
       raster_enc.draw(0, 1);
       enc.endRasterPass(raster_enc);
@@ -121,10 +121,10 @@ TEST_F(GPUTmpInput, MultiRasterPass)
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
       raster_enc.setShader(shader_);
-      u8 *new_pass_data = raster_enc.tmpBuffer(1).ptr;
+      u8 *new_pass_data = raster_enc.tmpBuffer(1, 256).ptr;
       EXPECT_EQ(new_pass_data - base, 768);
       raster_enc.drawData(Vector3 { 1, 0, 1 });
-      u8 *post_draw_data = raster_enc.tmpBuffer(1).ptr;
+      u8 *post_draw_data = raster_enc.tmpBuffer(1, 256).ptr;
       EXPECT_EQ(post_draw_data - base, 1280);
       raster_enc.draw(0, 1);
       enc.endRasterPass(raster_enc);

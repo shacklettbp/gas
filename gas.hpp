@@ -1,19 +1,13 @@
 #pragma once
 
 #include "namespace.hpp"
+#include "gas_fwd.hpp"
 
 #include <madrona/stack_alloc.hpp>
 
 #include "uuid.hpp"
 
 namespace gas {
-
-class RasterPassEncoder;
-class ComputePassEncoder;
-class CopyPassEncoder;
-class CommandEncoder;
-class GPURuntime;
-class ShaderCompiler;
 
 struct APIConfig {
   bool enableValidation = false;
@@ -594,7 +588,7 @@ friend class GPURuntime;
 
 struct GPUTmpInputBlock
 {
-  inline u32 alloc(u32 num_bytes);
+  inline u32 alloc(u32 num_bytes, u32 alignment);
   inline bool blockFull() const;
 
   static constexpr inline u32 BLOCK_SIZE = 4 * 1024 * 1024;
@@ -617,7 +611,7 @@ public:
   inline void setIndexBufferU32(Buffer buffer);
   inline void setIndexBufferU16(Buffer buffer);
 
-  inline MappedTmpBuffer tmpBuffer(u32 num_bytes);
+  inline MappedTmpBuffer tmpBuffer(u32 num_bytes, u32 alignment = 16);
 
   inline void * drawData(u32 num_bytes);
   template <typename T> T * drawData();
@@ -638,7 +632,7 @@ private:
                          u32 index_offset, u32 num_triangles,
                          u32 instance_offset, u32 num_instances);
 
-  inline u32 allocGPUTmpInput(u32 num_bytes);
+  inline u32 allocGPUTmpInput(u32 num_bytes, u32 alignment);
 
   inline RasterPassEncoder(GPURuntime *gpu,
                            CommandWriter writer,
@@ -682,7 +676,7 @@ public:
 
   inline void clearBuffer(Buffer buffer, u32 offset, u32 num_bytes);
 
-  inline MappedTmpBuffer tmpBuffer(u32 num_bytes);
+  inline MappedTmpBuffer tmpBuffer(u32 num_bytes, u32 alignment = 16);
 
 private:
   inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
