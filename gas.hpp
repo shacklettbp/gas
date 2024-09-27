@@ -536,7 +536,8 @@ struct DrawCommand {
   RasterShader shader = {};
   ParamBlock paramBlocks[3] = {};
   Buffer vertexBuffer[2] = {};
-  Buffer indexBuffer = {};
+  Buffer indexBuffer32 = {};
+  Buffer indexBuffer16 = {};
   Buffer dataBuffer = {};
   u32 dataOffset = 0;
   u32 indexOffset = 0;

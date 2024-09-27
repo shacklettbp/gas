@@ -360,23 +360,16 @@ void render(RasterPassEncoder &enc)
   ImDrawData *draw_data = ImGui::GetDrawData();
 
   MappedTmpBuffer tmp_vertices = enc.tmpBuffer(
-    sizeof(ImDrawVert) * draw_data->TotalVtxCount + sizeof(ImDrawVert) - 1);
+    sizeof(ImDrawVert) * draw_data->TotalVtxCount,
+    sizeof(ImDrawVert));
 
   MappedTmpBuffer tmp_indices = enc.tmpBuffer(
     sizeof(ImDrawIdx) * draw_data->TotalIdxCount);
 
-  u32 base_draw_vert_offset = utils::divideRoundUp(
-      tmp_vertices.offset, (u32)sizeof(ImDrawVert));
+  u32 base_draw_vert_offset = tmp_vertices.offset / sizeof(ImDrawVert);
   u32 base_draw_idx_offset = tmp_indices.offset / sizeof(ImDrawIdx);
 
-  ImDrawVert *tmp_verts_out;
-  {
-    u32 alignment_offset =
-        base_draw_vert_offset * sizeof(ImDrawVert) - tmp_vertices.offset;
-
-    tmp_verts_out = (ImDrawVert *)(tmp_vertices.ptr + alignment_offset);
-  }
-
+  ImDrawVert *tmp_verts_out = (ImDrawVert *)tmp_vertices.ptr;
   ImDrawIdx *tmp_idxs_out = (ImDrawIdx *)tmp_indices.ptr;
 
   enc.setShader(bd->shader);

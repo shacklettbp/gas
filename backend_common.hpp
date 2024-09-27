@@ -414,7 +414,7 @@ inline void debugPrintDrawCommandCtrl(CommandCtrl ctrl)
     printf(" | IndexBuffer32");
   }
   if ((ctrl & DrawIndexBuffer16) != None) {
-    printf(" | IndexBuffer32");
+    printf(" | IndexBuffer16");
   }
   if ((ctrl & DrawIndexOffset) != None) {
     printf(" | IndexOffset");

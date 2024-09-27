@@ -187,22 +187,22 @@ void RasterPassEncoder::setVertexBuffer(i32 idx, Buffer buffer)
 
 void RasterPassEncoder::setIndexBufferU32(Buffer buffer)
 {
-  if (state_.indexBuffer == buffer) {
+  if (state_.indexBuffer32 == buffer) {
     return;
   }
 
   ctrl_ |= CommandCtrl::DrawIndexBuffer32;
-  state_.indexBuffer = buffer;
+  state_.indexBuffer32 = buffer;
 }
 
 void RasterPassEncoder::setIndexBufferU16(Buffer buffer)
 {
-  if (state_.indexBuffer == buffer) {
+  if (state_.indexBuffer16 == buffer) {
     return;
   }
 
   ctrl_ |= CommandCtrl::DrawIndexBuffer16;
-  state_.indexBuffer = buffer;
+  state_.indexBuffer16 = buffer;
 }
 
 MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
@@ -346,8 +346,12 @@ void RasterPassEncoder::encodeDraw(
     writer_.id(gpu_, state_.vertexBuffer[1]);
   }
 
-  if ((ctrl_ & (DrawIndexBuffer32 | DrawIndexBuffer16)) != None) {
-    writer_.id(gpu_, state_.indexBuffer);
+  if ((ctrl_ & (DrawIndexBuffer32)) != None) {
+    writer_.id(gpu_, state_.indexBuffer32);
+  }
+
+  if ((ctrl_ & (DrawIndexBuffer16)) != None) {
+    writer_.id(gpu_, state_.indexBuffer16);
   }
 
   if (state_.indexOffset != index_offset) {
