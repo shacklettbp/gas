@@ -604,6 +604,7 @@ void CommandEncoder::beginEncoding()
   cmd_writer_.offset_ = 0;
 
   gpu_input_ = GPUTmpMemBlock {};
+  tmp_staging_ = GPUTmpMemBlock {};
 }
 
 void CommandEncoder::endEncoding()
