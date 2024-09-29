@@ -1301,53 +1301,7 @@ void Backend::createParamBlocks(i32 num_blks,
 
     auto [to_group, _, id] = paramBlocks.get(tbl_offset, blk_idx);
 
-    wgpu::BindGroupLayout layout =
-      getBindGroupLayoutByParamBlockTypeID(init.typeID);
-
-    wgpu::BindGroupEntry entries[MAX_BINDINGS_PER_GROUP];
-
-    i32 entry_idx = 0;
-    for (BufferBinding binding : init.buffers) {
-      wgpu::Buffer *to_buf = buffers.hot(binding.buffer);
-      entries[entry_idx] = wgpu::BindGroupEntry {
-        .binding = (u32)entry_idx,
-        .buffer = *to_buf,
-        .offset = (u64)binding.offset,
-        .size = binding.numBytes == 0xFFFF'FFFF ?
-          WGPU_WHOLE_SIZE : (u64)binding.numBytes,
-      };
-
-      entry_idx += 1;
-    }
-
-    for (Texture texture : init.textures) {
-      BackendTexture *to_tex = textures.hot(texture);
-      entries[entry_idx] = wgpu::BindGroupEntry {
-        .binding = (u32)entry_idx,
-        .textureView = to_tex->view,
-      };
-      entry_idx += 1;
-    }
-
-    for (Sampler sampler : init.samplers) {
-      wgpu::Sampler *to_sampler = samplers.hot(sampler);
-      entries[entry_idx] = wgpu::BindGroupEntry {
-        .binding = (u32)entry_idx,
-        .sampler = *to_sampler,
-      };
-      entry_idx += 1;
-    }
-
-    wgpu::BindGroupDescriptor descriptor {
-      .layout = layout,
-      .entryCount = size_t(
-        init.buffers.size() +
-        init.textures.size() +
-        init.samplers.size()),
-      .entries = entries,
-    }; 
-
-    new (to_group) wgpu::BindGroup(dev.CreateBindGroup(&descriptor));
+    new (to_group) wgpu::BindGroup(createBindGroup(init));
 
     handles_out[blk_idx] = id;
   }
@@ -1371,6 +1325,13 @@ ParamBlock Backend::createTemporaryParamBlock(
   i32 tmp_idx = AtomicU32Ref(tmp_state.numLive).fetch_add_relaxed(1);
   auto [to_group, _, id] = paramBlocks.get(tmp_state.baseHandleOffset, tmp_idx);
 
+  new (to_group) wgpu::BindGroup(createBindGroup(init));
+
+  return id;
+}
+
+wgpu::BindGroup Backend::createBindGroup(ParamBlockInit init)
+{
   wgpu::BindGroupLayout layout =
     getBindGroupLayoutByParamBlockTypeID(init.typeID);
 
@@ -1417,9 +1378,7 @@ ParamBlock Backend::createTemporaryParamBlock(
     .entries = entries,
   }; 
 
-  new (to_group) wgpu::BindGroup(dev.CreateBindGroup(&descriptor));
-
-  return id;
+  return wgpu::BindGroup(dev.CreateBindGroup(&descriptor));
 }
 
 void Backend::createRasterPassInterfaces(

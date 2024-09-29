@@ -302,6 +302,8 @@ public:
     GPUQueue queue_hdl,
     ParamBlockInit init) final;
 
+  inline wgpu::BindGroup createBindGroup(ParamBlockInit init);
+
   void createRasterPassInterfaces(
       i32 num_interfaces,
       const RasterPassInterfaceInit *interface_inits,
