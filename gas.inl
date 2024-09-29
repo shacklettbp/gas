@@ -573,27 +573,27 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
     };
   }
 
-  u32 offset = gpu_input_.alloc(num_bytes, alignment);
-  if (gpu_input_.blockFull()) [[unlikely]] {
-    gpu_input_ = gpu_->allocGPUTmpStagingBlock(queue_);
+  u32 offset = tmp_staging_.alloc(num_bytes, alignment);
+  if (tmp_staging_.blockFull()) [[unlikely]] {
+    tmp_staging_ = gpu_->allocGPUTmpStagingBlock(queue_);
 
-    offset = utils::roundUp(gpu_input_.offset, alignment);
-    gpu_input_.offset = offset + num_bytes;
+    offset = utils::roundUp(tmp_staging_.offset, alignment);
+    tmp_staging_.offset = offset + num_bytes;
   }
 
   return MappedTmpBuffer {
-    .buffer = gpu_input_.buffer,
+    .buffer = tmp_staging_.buffer,
     .offset = offset,
-    .ptr = gpu_input_.ptr + offset,
+    .ptr = tmp_staging_.ptr + offset,
   };
 }
 
 CopyPassEncoder::CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
-                                 GPUQueue queue, GPUTmpMemBlock gpu_input)
+                                 GPUQueue queue, GPUTmpMemBlock tmp_staging)
   : gpu_(gpu),
     writer_(writer),
     queue_(queue),
-    gpu_input_(gpu_input),
+    tmp_staging_(tmp_staging),
     ctrl_(CommandCtrl::None),
     state_()
 {}
@@ -640,14 +640,14 @@ void CommandEncoder::endComputePass(ComputePassEncoder &compute_enc)
 CopyPassEncoder CommandEncoder::beginCopyPass()
 {
   cmd_writer_.ctrl(gpu_, CommandCtrl::CopyPass);
-  return CopyPassEncoder(gpu_, cmd_writer_, queue_, gpu_input_);
+  return CopyPassEncoder(gpu_, cmd_writer_, queue_, tmp_staging_);
 }
 
 void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
 {
   cmd_writer_ = copy_enc.writer_;
   cmd_writer_.ctrl(gpu_, CommandCtrl::None);
-  gpu_input_ = copy_enc.gpu_input_;
+  tmp_staging_ = copy_enc.tmp_staging_;
 }
 
 Buffer GPURuntime::createBuffer(BufferInit init,
@@ -807,7 +807,8 @@ CommandEncoder::CommandEncoder(GPURuntime *gpu,
     cmds_head_(gpu->allocCommandBlock()),
     cmd_writer_(),
     queue_(queue),
-    gpu_input_()
+    gpu_input_(),
+    tmp_staging_()
 {}
 
 RasterPassEncoder::RasterPassEncoder() = default;

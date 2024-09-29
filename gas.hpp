@@ -677,12 +677,12 @@ public:
 
 private:
   inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
-                         GPUQueue queue, GPUTmpMemBlock gpu_input);
+                         GPUQueue queue, GPUTmpMemBlock tmp_staging);
 
   GPURuntime *gpu_;
   CommandWriter writer_;
   GPUQueue queue_;
-  GPUTmpMemBlock gpu_input_;
+  GPUTmpMemBlock tmp_staging_;
   CommandCtrl ctrl_;
   CopyCommand state_;
 
@@ -713,6 +713,7 @@ private:
   CommandWriter cmd_writer_;
   GPUQueue queue_;
   GPUTmpMemBlock gpu_input_;
+  GPUTmpMemBlock tmp_staging_;
 
 friend class GPURuntime;
 };

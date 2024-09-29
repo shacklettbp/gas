@@ -1323,6 +1323,7 @@ ParamBlock Backend::createTemporaryParamBlock(
   TmpParamBlockState &tmp_state = queueDatas[queue_hdl.id].tmpParamBlockState;
 
   i32 tmp_idx = AtomicU32Ref(tmp_state.numLive).fetch_add_relaxed(1);
+  assert(tmp_idx < MAX_TMP_PARAM_BLOCKS_PER_QUEUE);
   auto [to_group, _, id] = paramBlocks.get(tmp_state.baseHandleOffset, tmp_idx);
 
   new (to_group) wgpu::BindGroup(createBindGroup(init));
@@ -2414,6 +2415,19 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
   queue.Submit(1, &cmd_buf);
 
   mapActiveStagingBuffers(gpu_tmp_input);
+
+  // Destroy temporary parameter blocks (webgpu manages keeping these alive
+  // until the submission is done
+  {
+    TmpParamBlockState &tmp_param_block_state = queue_data.tmpParamBlockState;
+
+    for (i32 i = 0; i < (i32)tmp_param_block_state.numLive; i++) {
+      auto [to_param_block, _1, _2] = paramBlocks.get(
+          tmp_param_block_state.baseHandleOffset, i);
+
+      to_param_block->~BindGroup();
+    }
+  }
 }
 
 BackendRasterPassConfig * Backend::getRasterPassConfigByID(
