@@ -575,7 +575,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 
   u32 offset = gpu_input_.alloc(num_bytes, alignment);
   if (gpu_input_.blockFull()) [[unlikely]] {
-    gpu_input_ = gpu_->allocGPUTmpInputBlock(queue_);
+    gpu_input_ = gpu_->allocGPUTmpStagingBlock(queue_);
 
     offset = utils::roundUp(gpu_input_.offset, alignment);
     gpu_input_.offset = offset + num_bytes;

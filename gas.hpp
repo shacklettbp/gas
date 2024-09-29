@@ -22,6 +22,7 @@ constexpr inline i32 MAX_BIND_GROUPS_PER_SHADER = 4;
 constexpr inline i32 MAX_VERTEX_BUFFERS_PER_SHADER = 2;
 constexpr inline i32 MAX_VERTEX_ATTRIBUTES = 8;
 constexpr inline i32 MAX_BINDINGS_PER_GROUP = 128;
+constexpr inline i32 MAX_TMP_PARAM_BLOCKS_PER_QUEUE = 64;
 
 // Resource Handles
 template <typename T>
@@ -816,6 +817,10 @@ public:
   virtual void destroyParamBlocks(
       i32 num_blks, ParamBlock *blks) = 0;
 
+  virtual ParamBlock createTemporaryParamBlock(
+    GPUQueue queue_hdl,
+    ParamBlockInit init) = 0;
+
   // ==== Create & destroy render passes ======================================
   inline RasterPassInterface createRasterPassInterface(
       RasterPassInterfaceInit init);
@@ -879,6 +884,7 @@ protected:
   FrontendCommands * allocCommandBlock();
   void deallocCommandBlocks(FrontendCommands *cmds);
 
+  virtual GPUTmpInputBlock allocGPUTmpStagingBlock(GPUQueue queue) = 0;
   virtual GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue) = 0;
 
 friend class CommandEncoder;

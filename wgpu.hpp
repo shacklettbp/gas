@@ -127,8 +127,14 @@ struct GPUTmpInputState {
   SpinLock lock {};
 };
 
+struct TmpParamBlockState {
+  alignas(MADRONA_CACHE_LINE) u32 numLive;
+  u32 baseHandleOffset;
+};
+
 struct BackendQueueData {
   GPUTmpInputState gpuTmpInput;
+  TmpParamBlockState tmpParamBlockState;
 };
 
 class WebGPUAPI final : public GPUAPI {
@@ -155,6 +161,7 @@ using TextureTable = ResourceTable<
     BackendTexture, 
     BackendTextureCold
   >;
+
 using SamplerTable = ResourceTable<
     Sampler,
     wgpu::Sampler, 
@@ -184,6 +191,7 @@ using RasterPassInterfaceTable = ResourceTable<
     BackendRasterPassConfig,
     RasterPassInterfaceID
   >;
+
 using RasterPassTable = ResourceTable<
     RasterPass,
     BackendRasterPass,
@@ -292,6 +300,10 @@ public:
   void destroyParamBlocks(
       i32 num_blks, ParamBlock *blks) final;
 
+  ParamBlock createTemporaryParamBlock(
+    GPUQueue queue_hdl,
+    ParamBlockInit init) final;
+
   void createRasterPassInterfaces(
       i32 num_interfaces,
       const RasterPassInterfaceInit *interface_inits,
@@ -325,6 +337,7 @@ public:
 
   ShaderByteCodeType backendShaderByteCodeType() final;
 
+  GPUTmpInputBlock allocGPUTmpStagingBlock(GPUQueue queue_hdl) final;
   GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
 
   inline BackendRasterPassConfig * getRasterPassConfigByID(
