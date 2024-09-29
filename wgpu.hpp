@@ -86,7 +86,7 @@ constexpr inline u32 TMP_BUFFER_SIZE = 64 * 1024 * 1024;
 constexpr inline i32 MAX_TMP_BUFFERS_PER_QUEUE = 16;
 constexpr inline i32 MAX_TMP_STAGING_BUFFERS = 64;
 constexpr inline u32 NUM_BLOCKS_PER_TMP_BUFFER =
-  TMP_BUFFER_SIZE / GPUTmpInputBlock::BLOCK_SIZE;
+  TMP_BUFFER_SIZE / GPUTmpMemBlock::BLOCK_SIZE;
 
 struct StagingBelt {
   struct CallbackState {
@@ -108,22 +108,20 @@ struct StagingBelt {
   SpinLock lock;
 };
 
-struct TmpGPUBuffer {
-  wgpu::Buffer buffer;
-  wgpu::BindGroup bindGroup;
-};
-
 struct GPUTmpInputState {
-  std::array<TmpGPUBuffer, MAX_TMP_BUFFERS_PER_QUEUE>
-      tmpGPUBuffers;
+  std::array<wgpu::BindGroup, MAX_TMP_BUFFERS_PER_QUEUE>
+      tmpGPUBufferBindGroups;
 
-  std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> activeStagingBuffers;
+  std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> tmpStagingBuffers;
 
-  std::array<i32, MAX_TMP_STAGING_BUFFERS> stagingBeltIdxToTmpGPU;
+  std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> gpuTmpInputStagingBuffers;
 
-  alignas(MADRONA_CACHE_LINE) u64 curStagingRange;
-  alignas(MADRONA_CACHE_LINE) u32 numTmpGPUBuffers;
+  alignas(MADRONA_CACHE_LINE) u64 curTmpStagingRange;
+  alignas(MADRONA_CACHE_LINE) u64 curTmpInputRange;
   u32 maxNumUsedTmpGPUBuffers;
+
+  u32 tmpBufferHandlesBase;
+
   SpinLock lock {};
 };
 
@@ -337,8 +335,8 @@ public:
 
   ShaderByteCodeType backendShaderByteCodeType() final;
 
-  GPUTmpInputBlock allocGPUTmpStagingBlock(GPUQueue queue_hdl) final;
-  GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
+  GPUTmpMemBlock allocGPUTmpStagingBlock(GPUQueue queue_hdl) final;
+  GPUTmpMemBlock allocGPUTmpInputBlock(GPUQueue queue_hdl) final;
 
   inline BackendRasterPassConfig * getRasterPassConfigByID(
       RasterPassInterfaceID id);
@@ -352,11 +350,10 @@ public:
 
   //void allocTmpDynUniformBlock(BackendQueueData &queue_data);
 
-  inline i32 allocTmpGPUBuffer(GPUTmpInputState &state);
+  inline void allocGPUTmpBuffer(GPUTmpInputState &state, i32 buf_idx);
 
-  i32 unmapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input);
-  void mapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input,
-                               i32 num_active_staging_buffers);
+  void unmapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input);
+  void mapActiveStagingBuffers(GPUTmpInputState &gpu_tmp_input);
 
   void submit(GPUQueue queue_hdl, FrontendCommands *cmds) final;
 };

@@ -583,7 +583,7 @@ friend class CommandEncoder;
 friend class GPURuntime;
 };
 
-struct GPUTmpInputBlock
+struct GPUTmpMemBlock
 {
   inline u32 alloc(u32 num_bytes, u32 alignment);
   inline bool blockFull() const;
@@ -634,12 +634,12 @@ private:
   inline RasterPassEncoder(GPURuntime *gpu,
                            CommandWriter writer,
                            GPUQueue queue,
-                           GPUTmpInputBlock gpu_input);
+                           GPUTmpMemBlock gpu_input);
 
   GPURuntime *gpu_;
   CommandWriter writer_;
   GPUQueue queue_;
-  GPUTmpInputBlock gpu_input_;
+  GPUTmpMemBlock gpu_input_;
   CommandCtrl ctrl_;
   DrawCommand state_;
   std::array<u32, 4> draw_scissors_;
@@ -677,12 +677,12 @@ public:
 
 private:
   inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
-                         GPUQueue queue, GPUTmpInputBlock gpu_input);
+                         GPUQueue queue, GPUTmpMemBlock gpu_input);
 
   GPURuntime *gpu_;
   CommandWriter writer_;
   GPUQueue queue_;
-  GPUTmpInputBlock gpu_input_;
+  GPUTmpMemBlock gpu_input_;
   CommandCtrl ctrl_;
   CopyCommand state_;
 
@@ -712,7 +712,7 @@ private:
   FrontendCommands *cmds_head_;
   CommandWriter cmd_writer_;
   GPUQueue queue_;
-  GPUTmpInputBlock gpu_input_;
+  GPUTmpMemBlock gpu_input_;
 
 friend class GPURuntime;
 };
@@ -884,8 +884,8 @@ protected:
   FrontendCommands * allocCommandBlock();
   void deallocCommandBlocks(FrontendCommands *cmds);
 
-  virtual GPUTmpInputBlock allocGPUTmpStagingBlock(GPUQueue queue) = 0;
-  virtual GPUTmpInputBlock allocGPUTmpInputBlock(GPUQueue queue) = 0;
+  virtual GPUTmpMemBlock allocGPUTmpStagingBlock(GPUQueue queue) = 0;
+  virtual GPUTmpMemBlock allocGPUTmpInputBlock(GPUQueue queue) = 0;
 
 friend class CommandEncoder;
 friend class RasterPassEncoder;

@@ -121,14 +121,14 @@ void CommandWriter::ctrl(GPURuntime *gpu, CommandCtrl ctrl)
   writeU32(gpu, (u32)ctrl);
 }
 
-u32 GPUTmpInputBlock::alloc(u32 num_bytes, u32 alignment)
+u32 GPUTmpMemBlock::alloc(u32 num_bytes, u32 alignment)
 {
   u32 start = utils::roundUp(offset, alignment);
   offset = start + num_bytes;
   return start;
 }
 
-bool GPUTmpInputBlock::blockFull() const
+bool GPUTmpMemBlock::blockFull() const
 { 
   return offset > BLOCK_SIZE; 
 }
@@ -207,7 +207,7 @@ void RasterPassEncoder::setIndexBufferU16(Buffer buffer)
 
 MappedTmpBuffer RasterPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 {
-  if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) [[unlikely]] {
+  if (num_bytes > GPUTmpMemBlock::BLOCK_SIZE) [[unlikely]] {
     return MappedTmpBuffer {
       .buffer = {},
       .offset = 0,
@@ -392,7 +392,7 @@ void RasterPassEncoder::encodeDraw(
 RasterPassEncoder::RasterPassEncoder(GPURuntime *gpu,
                                      CommandWriter writer,
                                      GPUQueue queue,
-                                     GPUTmpInputBlock gpu_input)
+                                     GPUTmpMemBlock gpu_input)
   : gpu_(gpu),
     writer_(writer),
     queue_(queue),
@@ -565,7 +565,7 @@ void CopyPassEncoder::clearBuffer(Buffer buffer, u32 offset, u32 num_bytes)
 
 MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 {
-  if (num_bytes > GPUTmpInputBlock::BLOCK_SIZE) [[unlikely]] {
+  if (num_bytes > GPUTmpMemBlock::BLOCK_SIZE) [[unlikely]] {
     return MappedTmpBuffer {
       .buffer = {},
       .offset = 0,
@@ -589,7 +589,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
 }
 
 CopyPassEncoder::CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
-                                 GPUQueue queue, GPUTmpInputBlock gpu_input)
+                                 GPUQueue queue, GPUTmpMemBlock gpu_input)
   : gpu_(gpu),
     writer_(writer),
     queue_(queue),
@@ -603,7 +603,7 @@ void CommandEncoder::beginEncoding()
   cmd_writer_.cmds_ = cmds_head_;
   cmd_writer_.offset_ = 0;
 
-  gpu_input_ = GPUTmpInputBlock {};
+  gpu_input_ = GPUTmpMemBlock {};
 }
 
 void CommandEncoder::endEncoding()

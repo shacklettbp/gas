@@ -222,7 +222,7 @@ TEST_F(GPUTmpInput, MultiBlock)
     f32 iter_v = f32(i) / (num_iters - 1);
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp0);
-      raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+      raster_enc.tmpBuffer(GPUTmpMemBlock::BLOCK_SIZE);
 
       raster_enc.setShader(shader_);
       raster_enc.drawData(Vector3 { 1, 1, iter_v });
@@ -233,14 +233,14 @@ TEST_F(GPUTmpInput, MultiBlock)
     {
       CopyPassEncoder copy_enc = enc.beginCopyPass();
       for (i32 j = 0; j < 65; j++) {
-        copy_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+        copy_enc.tmpBuffer(GPUTmpMemBlock::BLOCK_SIZE);
       }
       enc.endCopyPass(copy_enc);
     }
 
     {
       RasterPassEncoder raster_enc = enc.beginRasterPass(rp1);
-      raster_enc.tmpBuffer(GPUTmpInputBlock::BLOCK_SIZE);
+      raster_enc.tmpBuffer(GPUTmpMemBlock::BLOCK_SIZE);
 
       raster_enc.setShader(shader_);
       raster_enc.drawData(Vector3 { 1, iter_v, 1 });
