@@ -133,6 +133,12 @@ bool GPUTmpMemBlock::blockFull() const
   return offset > BLOCK_SIZE; 
 }
 
+ParamBlock RasterPassEncoder::createTemporaryParamBlock(
+  ParamBlockInit init)
+{
+  return gpu_->createTemporaryParamBlock(queue_, init);
+}
+
 void RasterPassEncoder::setDrawScissors(u32 offset_x, u32 offset_y,
                                         u32 width, u32 height)
 {

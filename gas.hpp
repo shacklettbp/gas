@@ -599,6 +599,9 @@ class RasterPassEncoder {
 public:
   inline RasterPassEncoder();
 
+  inline ParamBlock createTemporaryParamBlock(
+      ParamBlockInit init);
+
   inline void setDrawScissors(u32 offset_x, u32 offset_y,
                               u32 width, u32 height);
 

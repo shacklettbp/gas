@@ -887,6 +887,8 @@ void Backend::createGPUResources(i32 num_buffers,
     queue.Submit(1, &cmd_buf);
 
     mapActiveStagingBuffers(gpu_tmp_input);
+
+    gpu_tmp_input.curTmpStagingRange = 0;
   }
 }
 
@@ -1804,17 +1806,9 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
   to_cold->texture = nullptr;
 }
 
-void Backend::waitUntilReady(GPUQueue queue_hdl)
+void Backend::waitUntilReady(GPUQueue)
 {
   inst.ProcessEvents();
-
-  BackendQueueData &queue_data = queueDatas[queue_hdl.id];
-
-  {
-    GPUTmpInputState &tmp_input_state = queue_data.gpuTmpInput;
-    tmp_input_state.curTmpStagingRange = 0;
-    tmp_input_state.curTmpInputRange = 0;
-  }
 }
 
 void Backend::waitUntilWorkFinished(GPUQueue)
@@ -2416,6 +2410,13 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
   mapActiveStagingBuffers(gpu_tmp_input);
 
+
+  // Clear staging buffer tracking for next submission
+  {
+    gpu_tmp_input.curTmpStagingRange = 0;
+    gpu_tmp_input.curTmpInputRange = 0;
+  }
+
   // Destroy temporary parameter blocks (webgpu manages keeping these alive
   // until the submission is done
   {
@@ -2427,6 +2428,8 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
 
       to_param_block->~BindGroup();
     }
+
+    tmp_param_block_state.numLive = 0;
   }
 }
 
