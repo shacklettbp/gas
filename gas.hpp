@@ -2,10 +2,11 @@
 
 #include "namespace.hpp"
 #include "gas_fwd.hpp"
+#include "uuid.hpp"
 
 #include <madrona/stack_alloc.hpp>
 
-#include "uuid.hpp"
+#include <cassert>
 
 namespace gas {
 

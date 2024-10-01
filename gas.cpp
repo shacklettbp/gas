@@ -2,6 +2,7 @@
 #include "backend_common.hpp"
 
 #include <madrona/crash.hpp>
+#include <madrona/memory.hpp>
 #include <madrona/sync.hpp>
 
 namespace gas {

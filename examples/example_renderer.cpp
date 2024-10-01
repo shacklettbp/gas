@@ -2,6 +2,8 @@
 #include <gas/gas_imgui.hpp>
 #include <gas/shader_compiler.hpp>
 
+#include <cstdio>
+
 namespace {
 
 void buildUI()

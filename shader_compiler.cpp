@@ -4,6 +4,8 @@
 
 #include <slang.h>
 
+#include <cstdio>
+
 #ifdef GAS_SUPPORT_WEBGPU
 #include "wgpu_shader_compiler.hpp"
 #endif

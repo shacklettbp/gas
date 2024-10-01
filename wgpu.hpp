@@ -5,6 +5,8 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include <madrona/sync.hpp>
+
 namespace gas::webgpu {
 
 class Backend;

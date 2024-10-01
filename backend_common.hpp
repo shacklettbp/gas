@@ -7,6 +7,9 @@
 #include <madrona/utils.hpp>
 #include <madrona/macros.hpp>
 
+#include <cstdio>
+#include <cassert>
+
 namespace gas {
 
 inline u32 bytesPerTexelForFormat(TextureFormat fmt)

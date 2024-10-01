@@ -1,6 +1,9 @@
 #include "mem.hpp"
-#include <cstring>
+
+#include <algorithm>
 #include <bit>
+#include <cstring>
+#include <cassert>
 
 #if 0
 OffsetAlloc class modified from https://github.com/sebbbi/OffsetOffsetAlloc

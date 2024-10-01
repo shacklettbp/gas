@@ -2,6 +2,8 @@
 
 #include "namespace.hpp"
 
+#include <madrona/utils.hpp>
+
 namespace gas {
 
 // Note these aren't any kind of standardized UUIDs. Just 128 bit random values
