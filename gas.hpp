@@ -411,6 +411,9 @@ struct BlendingConfig {
 struct RasterHWConfig {
   DepthCompare depthCompare = DepthCompare::GreaterOrEqual;
   bool writeDepth = true;
+  int depthBias = 0;
+  float depthBiasSlope = 0.f;
+  float depthBiasClamp = 0.f;
   CullMode cullMode = CullMode::BackFace;
   Span<const BlendingConfig> blending = {};
 };

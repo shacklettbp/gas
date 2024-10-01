@@ -1584,6 +1584,9 @@ void Backend::createRasterShaders(i32 num_shaders,
       .format = pass_cfg->depthAttachment.format,
       .depthWriteEnabled = raster_cfg.writeDepth,
       .depthCompare = convertDepthCompare(raster_cfg.depthCompare),
+      .depthBias = raster_cfg.depthBias,
+      .depthBiasSlopeScale = raster_cfg.depthBiasSlope,
+      .depthBiasClamp = raster_cfg.depthBiasClamp,
     };
 
     wgpu::ColorTargetState color_tgt_states[MAX_COLOR_ATTACHMENTS];
