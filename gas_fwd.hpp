@@ -12,6 +12,8 @@ class GPURuntime;
 class GPULib;
 class GPUAPI;
 
+struct Window;
+
 struct Texture;
 struct Sampler;
 struct Buffer;
