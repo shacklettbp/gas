@@ -492,7 +492,7 @@ bool UIBackend::processEvents()
       case SDLK_O:         return InputID::O;
       case SDLK_P:         return InputID::P;
       case SDLK_Q:         return InputID::Q;
-      case SDLK_R:         return InputID::S;
+      case SDLK_R:         return InputID::R;
       case SDLK_S:         return InputID::S;
       case SDLK_T:         return InputID::T;
       case SDLK_U:         return InputID::U;
