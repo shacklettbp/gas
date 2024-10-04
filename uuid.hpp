@@ -3,6 +3,7 @@
 #include "namespace.hpp"
 
 #include <madrona/utils.hpp>
+#include <madrona/types.hpp>
 
 namespace gas {
 
