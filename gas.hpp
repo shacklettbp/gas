@@ -615,7 +615,7 @@ public:
   inline void setIndexBufferU32(Buffer buffer);
   inline void setIndexBufferU16(Buffer buffer);
 
-  inline MappedTmpBuffer tmpBuffer(u32 num_bytes, u32 alignment = 16);
+  inline MappedTmpBuffer tmpBuffer(u32 num_bytes, u32 alignment = 256);
 
   inline void * drawData(u32 num_bytes);
   template <typename T> T * drawData();
