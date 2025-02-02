@@ -163,6 +163,8 @@ ImGuiKey inputIDKeyToImGuiKey(InputID id)
     case Shift: return ImGuiKey_LeftShift;
     case Space: return ImGuiKey_Space;
     case BackSpace: return ImGuiKey_Backspace;
+    case Esc: return ImGuiKey_Escape;
+    case Enter: return ImGuiKey_Enter;
     default: return ImGuiKey_None;
   }
 }

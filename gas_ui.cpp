@@ -515,6 +515,8 @@ bool UIBackend::processEvents()
       case SDLK_RSHIFT:    return InputID::Shift;
       case SDLK_SPACE:     return InputID::Space;
       case SDLK_BACKSPACE: return InputID::BackSpace;
+      case SDLK_ESCAPE:    return InputID::Esc;
+      case SDLK_RETURN:    return InputID::Enter;
     }
   };
 
