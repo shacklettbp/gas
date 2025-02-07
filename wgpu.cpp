@@ -298,27 +298,27 @@ inline wgpu::BlendFactor convertBlendFactor(BlendFactor in)
   }
 }
 
-void instanceLoggingCB(WGPULoggingType type,
-                       const char *message,
+void instanceLoggingCB(wgpu::LoggingType type,
+                       wgpu::StringView message,
                        void *user_data)
 {
   (void)type;
   (void)user_data;
-  fprintf(stderr, " Instance Logging: %s\n", message);
+  fprintf(stderr, " Instance Logging: %s\n", message.data);
 }
 
-void deviceLoggingCB(WGPULoggingType type,
-                     const char *message,
+void deviceLoggingCB(wgpu::LoggingType type,
+                     wgpu::StringView message,
                      void *user_data)
 {
   (void)type;
   (void)user_data;
-  fprintf(stderr, " Device Logging: %s\n", message);
+  fprintf(stderr, " Device Logging: %s\n", message.data);
 }
 
 void deviceLostCB(const wgpu::Device &wgpu_dev,
                   wgpu::DeviceLostReason lost_reason,
-                  const char *message,
+                  wgpu::StringView message,
                   WGPUDevice *destroying_device)
 {
   (void)lost_reason;
@@ -327,19 +327,19 @@ void deviceLostCB(const wgpu::Device &wgpu_dev,
     return;
   }
 
-  FATAL(" device lost: %s", message);
+  FATAL(" device lost: %s", message.data);
 }
 
 void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
                        wgpu::ErrorType error_type,
-                       const char *message,
+                       wgpu::StringView message,
                        void *user_data)
 {
   (void)wgpu_dev;
   (void)error_type;
   (void)user_data;
 
-  fprintf(stderr, " uncaptured error: %s\n", message);
+  fprintf(stderr, " uncaptured error: %s\n", message.data);
   debuggerBreakPoint();
 }
 
@@ -348,7 +348,7 @@ void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
 GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
 {
   wgpu::InstanceDescriptor inst_desc {
-    .features = {
+    .capabilities = {
       .timedWaitAnyEnable = false,
     },
   };
@@ -360,7 +360,7 @@ GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
 
     dawn_inst_desc.backendValidationLevel =
       dawn::native::BackendValidationLevel::Full;
-    dawn_inst_desc.loggingCallback = instanceLoggingCB;
+    dawn_inst_desc.SetLoggingCallback(instanceLoggingCB, (void *)nullptr);
   }
 
   wgpu::Instance instance = wgpu::CreateInstance(&inst_desc);
@@ -537,7 +537,7 @@ static InitDeviceResult initDevice(
     }
   }
 
-  device.SetLoggingCallback(deviceLoggingCB, nullptr);
+  device.SetLoggingCallback(deviceLoggingCB, (void *)nullptr);
 
   BackendLimits out_limits {
     .maxNumUniformBytes =
@@ -1554,6 +1554,7 @@ void Backend::createRasterShaders(i32 num_shaders,
       const VertexBufferConfig &vbuf_cfg = shader_init.vertexBuffers[vbuf_idx];
       wgpu::VertexBufferLayout &out_layout = vertex_buffers[vbuf_idx];
       out_layout.arrayStride = vbuf_cfg.stride;
+      out_layout.stepMode = wgpu::VertexStepMode::Vertex;
       
       wgpu::VertexAttribute *out_attrs = vertex_attributes[vbuf_idx].data();
       const i32 num_attrs = vbuf_cfg.attributes.size();
