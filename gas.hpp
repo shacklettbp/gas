@@ -242,6 +242,13 @@ enum class TextureBindingType : u16 {
   Texture2D,
   Texture3D,
   DepthTexture2D,
+  UnfilterableTexture2D,
+};
+
+enum class SamplerBindingType : u16 {
+  Filtering,
+  Comparison,
+  NonFiltering,
 };
 
 struct BufferBindingConfig {
@@ -261,6 +268,7 @@ struct TextureBindingConfig {
 };
 
 struct SamplerBindingConfig {
+  SamplerBindingType type = SamplerBindingType::Filtering;
   i32 bindLocation = -1;
   ShaderStage shaderUsage =
     ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute;

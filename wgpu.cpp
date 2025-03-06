@@ -111,7 +111,7 @@ inline wgpu::FilterMode convertSamplerFilterMode(SamplerFilterMode in)
 
   switch (in) {
     case Nearest: return O::Nearest;
-    case Linear: return O::Linear;
+    case Linear:  return O::Linear;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -124,7 +124,7 @@ inline wgpu::MipmapFilterMode
 
   switch (in) {
     case Nearest: return O::Nearest;
-    case Linear: return O::Linear;
+    case Linear:  return O::Linear;
     default: MADRONA_UNREACHABLE();
   }
 }
@@ -1224,8 +1224,12 @@ void Backend::createParamBlockTypes(
         case DepthTexture2D: {
           sample_type = wgpu::TextureSampleType::Depth;
           tex_dim = wgpu::TextureViewDimension::e2D;
-        default: MADRONA_UNREACHABLE();
         } break;
+        case UnfilterableTexture2D: {
+          sample_type = wgpu::TextureSampleType::UnfilterableFloat;
+          tex_dim = wgpu::TextureViewDimension::e2D;
+        } break;
+        default: MADRONA_UNREACHABLE();
       }
 
       layout_entries[out_binding_idx++] = wgpu::BindGroupLayoutEntry {
@@ -1251,11 +1255,26 @@ void Backend::createParamBlockTypes(
       }
       auto_binding_idx = binding + 1;
 
+      wgpu::SamplerBindingType wgpu_sampler_binding_type;
+      using enum SamplerBindingType;
+      switch (sampler_cfg.type) {
+        case Filtering: {
+          wgpu_sampler_binding_type = wgpu::SamplerBindingType::Filtering;
+        } break;
+        case Comparison: {
+          wgpu_sampler_binding_type = wgpu::SamplerBindingType::Comparison;
+        } break;
+        case NonFiltering: {
+          wgpu_sampler_binding_type = wgpu::SamplerBindingType::NonFiltering;
+        } break;
+        default: MADRONA_UNREACHABLE();
+      }
+
       layout_entries[out_binding_idx++] = wgpu::BindGroupLayoutEntry {
         .binding = (u32)binding,
         .visibility = convertShaderStage(sampler_cfg.shaderUsage),
         .sampler = wgpu::SamplerBindingLayout {
-          .type = wgpu::SamplerBindingType::Filtering,
+          .type = wgpu_sampler_binding_type,
         },
       };
     }
