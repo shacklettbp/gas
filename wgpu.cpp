@@ -1552,9 +1552,10 @@ void Backend::createRasterShaders(i32 num_shaders,
     const RasterShaderInit &shader_init = shader_inits[shader_idx];
     const RasterHWConfig &raster_cfg = shader_init.rasterConfig;
 
-    wgpu::ShaderModuleWGSLDescriptor wgsl_desc {{
+    wgpu::ShaderSourceWGSL wgsl_desc {{
       .nextInChain = nullptr,
-      .code = (const char *)shader_init.byteCode.data,
+      .code = wgpu::StringView((const char *)shader_init.byteCode.data,
+        (size_t)shader_init.byteCode.numBytes),
     }};
     wgpu::ShaderModuleDescriptor shader_mod_desc {
       .nextInChain = &wgsl_desc,

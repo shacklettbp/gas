@@ -7,7 +7,7 @@ set(SLANG_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/slang-build-config-hash"
 function(fetch_build_slang)
   FetchContent_Populate(slang-bundled
     GIT_REPOSITORY https://github.com/shader-slang/slang
-    GIT_TAG v2025.6.2
+    GIT_TAG v2025.6.3
     GIT_PROGRESS ON
     SOURCE_DIR "${SLANG_SRC_DIR}"
   )
