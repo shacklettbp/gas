@@ -95,18 +95,45 @@ function(find_dawn)
   
   add_library(gas_dawn_shlib SHARED IMPORTED GLOBAL)
   add_dependencies(gas_dawn_shlib gas_dawn_shlib_copy)
+
+  if (WIN32)
+    cmake_path(GET DAWN_IN_LOC PARENT_PATH DAWN_BIN_DIR)
+    set(DAWN_DXCOMPILER_IN_LOC "${DAWN_BIN_DIR}/dxcompiler.dll")
+    set(DAWN_DXCOMPILER_OUT_LOC "${DEP_LIB_OUT_DIR}/dxcompiler.dll")
+    set(DAWN_DXIL_IN_LOC "${DAWN_BIN_DIR}/dxil.dll")
+    set(DAWN_DXIL_OUT_LOC "${DEP_LIB_OUT_DIR}/dxil.dll")
+
+    add_custom_command(
+      OUTPUT 
+        ${DAWN_DXCOMPILER_OUT_LOC}
+      DEPENDS ${DAWN_DXCOMPILER_IN_LOC}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DAWN_DXCOMPILER_IN_LOC} ${DAWN_DXCOMPILER_OUT_LOC}
+    )
+
+    add_custom_command(
+      OUTPUT ${DAWN_DXIL_OUT_LOC}
+      DEPENDS ${DAWN_DXIL_IN_LOC}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DAWN_DXIL_IN_LOC} ${DAWN_DXIL_OUT_LOC}
+    )
+
+    add_custom_target(gas_dawn_dxcompiler_shlib_copy
+      DEPENDS ${DAWN_DXCOMPILER_OUT_LOC} ${DAWN_DXIL_OUT_LOC}
+    )
+    add_dependencies(gas_dawn_shlib gas_dawn_dxcompiler_shlib_copy)
+  endif ()
+
   set_target_properties(gas_dawn_shlib PROPERTIES IMPORTED_LOCATION
     ${DAWN_OUT_LOC}
   )
   
-  target_link_libraries(gas_dawn INTERFACE gas_dawn_shlib)
-
   if (WIN32)
     set_target_properties(gas_dawn_shlib PROPERTIES IMPORTED_IMPLIB
       ${DAWN_IMPLIB}
     )
   endif()
 
+  target_link_libraries(gas_dawn INTERFACE gas_dawn_shlib)
+  
   add_library(gas_dawn_tint_libs INTERFACE)
   target_include_directories(gas_dawn_tint_libs SYSTEM INTERFACE
     ${DAWN_BUNDLED_DIR}/include/src/tint

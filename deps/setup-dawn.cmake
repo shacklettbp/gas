@@ -46,6 +46,7 @@ endif()
     list(APPEND DAWN_CMAKE_ARGS
       "-DDAWN_ENABLE_D3D11=OFF"
       "-DDAWN_ENABLE_D3D12=ON"
+      "-DDAWN_USE_BUILT_DXC=ON"
     )
   endif()
 
@@ -145,6 +146,16 @@ index 61f4f4d2d4..43b18c1eef 100644
       --install "${DAWN_BUILD_DIR}"
       COMMAND_ERROR_IS_FATAL ANY
     )
+
+    if (WIN32)
+      # Install dxcompiler
+      file(INSTALL 
+          "${DAWN_BUILD_DIR}/dxc.exe"
+          "${DAWN_BUILD_DIR}/dxcompiler.dll"
+          "${DAWN_BUILD_DIR}/dxil.dll"
+        DESTINATION "${DAWN_BUNDLED_DIR}/bin")
+    endif()
+
 
     # Tint file is missing
     file(INSTALL "${DAWN_SRC_DIR}/src/utils/compiler.h"

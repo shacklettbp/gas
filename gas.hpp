@@ -12,6 +12,7 @@ namespace gas {
 
 struct APIConfig {
   bool enableValidation = false;
+  bool debugPipelineCompilation = false;
   bool runtimeErrorsAreFatal = false;
   bool enablePresent = false;
   Span<const char *const> apiExtensions = {};

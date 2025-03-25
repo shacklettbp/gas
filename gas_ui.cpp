@@ -150,6 +150,7 @@ UISystem * UISystem::init(const Config &cfg)
 
   GPUAPI *gpu_api = InitSystem::initAPI(api_select, gpu_lib, {
     .enableValidation = cfg.enableValidation,
+    .debugPipelineCompilation = cfg.debugPipelineCompilation,
     .runtimeErrorsAreFatal = cfg.runtimeErrorsAreFatal,
     .enablePresent = true,
     .apiExtensions = api_exts,

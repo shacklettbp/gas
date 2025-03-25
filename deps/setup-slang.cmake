@@ -60,7 +60,7 @@ endif()
     )
 
     execute_process(COMMAND ${CMAKE_COMMAND}
-      --build ${SLANG_SRC_DIR}/build --target install
+      --build ${SLANG_SRC_DIR}/build --config Release --target install
       COMMAND_ERROR_IS_FATAL ANY
     )
 

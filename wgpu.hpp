@@ -141,6 +141,7 @@ class WebGPUAPI final : public GPUAPI {
 public:
   wgpu::Instance inst;
   WGPUDevice destroyingDevice;
+  bool debugPipelineCompilation;
   bool errorsAreFatal;
 
   static GPUAPI * init(const APIConfig &cfg);

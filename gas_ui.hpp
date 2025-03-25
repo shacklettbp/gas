@@ -74,6 +74,7 @@ class UISystem {
 public:
   struct Config {
     bool enableValidation = false;
+    bool debugPipelineCompilation = false;
     bool runtimeErrorsAreFatal = false;
     Optional<GPUAPISelect> desiredGPUAPI =
       Optional<GPUAPISelect>::none();

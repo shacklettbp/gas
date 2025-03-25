@@ -367,6 +367,7 @@ GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
   auto *api = new WebGPUAPI();
   api->inst = std::move(instance);
   api->destroyingDevice = nullptr;
+  api->debugPipelineCompilation = cfg.debugPipelineCompilation;
   api->errorsAreFatal = cfg.runtimeErrorsAreFatal;
   return api;
 }
@@ -513,6 +514,15 @@ static InitDeviceResult initDevice(
 
     wgpu::DeviceDescriptor dev_desc;
     dev_desc.requiredLimits = &required_limits;
+
+    wgpu::DawnTogglesDescriptor dev_toggles_desc;
+    auto toggles = std::to_array({"dump_shaders"});
+    dev_toggles_desc.enabledToggleCount = 1;
+    dev_toggles_desc.enabledToggles = toggles.data();
+
+    if (api->debugPipelineCompilation) {
+      dev_desc.nextInChain = &dev_toggles_desc;
+    }
 
     dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
                                    deviceLostCB, &api->destroyingDevice);
@@ -1163,7 +1173,7 @@ void Backend::createParamBlockTypes(
 
     const i32 num_buffer_bindings = (i32)type_init.buffers.size();
     const i32 num_texture_bindings = (i32)type_init.textures.size();
-    const i32 num_sampler_bindings = (i32)type_init.textures.size();
+    const i32 num_sampler_bindings = (i32)type_init.samplers.size();
 
     i32 out_binding_idx = 0;
     for (i32 buffer_binding_idx = 0;
