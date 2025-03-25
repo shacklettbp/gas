@@ -466,7 +466,7 @@ static InitDeviceResult initDevice(
   assert(idx == 0);
   assert(surfaces.size() <= 1); // Can only have one compatible surface
 
-  wgpu::SupportedLimits supported_limits;
+  wgpu::Limits supported_limits;
   wgpu::Adapter adapter;
   {
     wgpu::RequestAdapterOptions request_options {
@@ -501,15 +501,15 @@ static InitDeviceResult initDevice(
     }
   }
 
-  if (supported_limits.limits.maxUniformBufferBindingSize > 65536) {
-    supported_limits.limits.maxUniformBufferBindingSize = 65536;
+  if (supported_limits.maxUniformBufferBindingSize > 65536) {
+    supported_limits.maxUniformBufferBindingSize = 65536;
   }
 
   wgpu::Device device;
   {
-    wgpu::RequiredLimits required_limits {};
-    required_limits.limits.maxUniformBufferBindingSize =
-        supported_limits.limits.maxUniformBufferBindingSize;
+    wgpu::Limits required_limits {};
+    required_limits.maxUniformBufferBindingSize =
+        supported_limits.maxUniformBufferBindingSize;
 
     wgpu::DeviceDescriptor dev_desc;
     dev_desc.requiredLimits = &required_limits;
@@ -541,7 +541,7 @@ static InitDeviceResult initDevice(
 
   BackendLimits out_limits {
     .maxNumUniformBytes =
-        (u32)supported_limits.limits.maxUniformBufferBindingSize,
+        (u32)supported_limits.maxUniformBufferBindingSize,
   };
 
   return { std::move(adapter), std::move(device), out_limits };
@@ -856,7 +856,7 @@ void Backend::createGPUResources(i32 num_buffers,
       u32 cur_offset = staging.offset;
       u32 mip_idx = 0;
 
-      wgpu::ImageCopyBuffer src {
+      wgpu::TexelCopyBufferInfo src {
         .layout = {
           .offset = cur_offset,
           .bytesPerRow = width * bytes_per_texel,
@@ -864,7 +864,7 @@ void Backend::createGPUResources(i32 num_buffers,
         .buffer = *buffers.hot(staging.buffer),
       };
 
-      wgpu::ImageCopyTexture dst {
+      wgpu::TexelCopyTextureInfo dst {
         .texture = to_cold->texture,
         .mipLevel = mip_idx,
       };
@@ -1712,14 +1712,21 @@ Swapchain Backend::createSwapchain(Surface surface,
     ((u64)capabilities.usages & (u64)wgpu::TextureUsage::CopyDst) != 0;
   wgpu::TextureFormat format = capabilities.formats[0];
 
+  wgpu::TextureUsage swapchain_usage = wgpu::TextureUsage::RenderAttachment;
+  if (supports_copy_dst) {
+    swapchain_usage |= wgpu::TextureUsage::CopyDst;
+  }
+
   wgpu::SurfaceConfiguration surface_cfg {
-      .device = dev,
-      .format = format,
-      .viewFormatCount = 0,
-      .viewFormats = nullptr,
-      .alphaMode = wgpu::CompositeAlphaMode::Opaque,
-      .width = (u32)surface.width,
-      .height = (u32)surface.height,
+    .device = dev,
+    .format = format,
+    .usage = swapchain_usage,
+    .width = (u32)surface.width,
+    .height = (u32)surface.height,
+    .viewFormatCount = 0,
+    .viewFormats = nullptr,
+    .alphaMode = wgpu::CompositeAlphaMode::Opaque,
+    .presentMode = wgpu::PresentMode::Fifo,
   };
   wgpu_surface.Configure(&surface_cfg);
 
@@ -1790,8 +1797,11 @@ AcquireSwapchainResult Backend::acquireSwapchainImage(Swapchain swapchain)
 
   wgpu::SurfaceTexture surface_tex;
   wgpu_swapchain.surface.GetCurrentTexture(&surface_tex);
-  if (surface_tex.status !=
-      wgpu::SurfaceGetCurrentTextureStatus::Success) [[unlikely]] {
+
+  bool optimal = surface_tex.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal;
+  bool suboptimal = surface_tex.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal;
+
+  if (!optimal && !suboptimal) [[unlikely]] {
     return {
       .texture = {},
       .status = SwapchainStatus::Invalid,
@@ -1810,7 +1820,7 @@ AcquireSwapchainResult Backend::acquireSwapchainImage(Swapchain swapchain)
 
   return {
     .texture = wgpu_swapchain.reservedHandle,
-    .status = surface_tex.suboptimal ?
+    .status = suboptimal ?
       SwapchainStatus::Suboptimal : SwapchainStatus::Valid,
   };
 }
@@ -2340,7 +2350,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           u32 height = std::max(mip0_height >> b2t.dstMipLevel, 1_u32);
           u32 depth = std::max(mip0_depth >> b2t.dstMipLevel, 1_u32);
 
-          wgpu::ImageCopyBuffer src {
+          wgpu::TexelCopyBufferInfo src {
             .layout = {
               .offset = b2t.srcOffset,
               .bytesPerRow = width * bytes_per_texel,
@@ -2348,7 +2358,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
             .buffer = *buffers.hot(b2t.src),
           };
 
-          wgpu::ImageCopyTexture dst {
+          wgpu::TexelCopyTextureInfo dst {
             .texture = to_tex_data->texture,
             .mipLevel = b2t.dstMipLevel,
           };
@@ -2382,12 +2392,12 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           u32 height = std::max(mip0_height >> t2b.srcMipLevel, 1_u32);
           u32 depth = std::max(mip0_depth >> t2b.srcMipLevel, 1_u32);
 
-          wgpu::ImageCopyTexture src {
+          wgpu::TexelCopyTextureInfo src {
             .texture = to_tex_data->texture,
             .mipLevel = t2b.srcMipLevel,
           };
 
-          wgpu::ImageCopyBuffer dst {
+          wgpu::TexelCopyBufferInfo dst {
             .layout = {
               .offset = t2b.dstOffset,
               .bytesPerRow = width * bytes_per_texel,

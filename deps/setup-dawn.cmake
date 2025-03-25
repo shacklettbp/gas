@@ -9,7 +9,7 @@ set(DAWN_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-config-hash")
 function(fetch_build_dawn)
   FetchContent_Populate(dawn-bundled
     GIT_REPOSITORY https://dawn.googlesource.com/dawn
-    GIT_TAG 863d392cd025980cbbcab26411819b32c9228af6
+    GIT_TAG c5a1c32fe1664f79c1a6efb3accc15e72af918b7
     GIT_PROGRESS ON
     GIT_SUBMODULES ""
     GIT_SUBMODULES_RECURSE OFF
