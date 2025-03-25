@@ -427,7 +427,7 @@ ShaderCompileResult CompilerBackend::compileShader(
       // FIXME
       fprintf(stderr, "%s\n", wgsl_diagnostics);
     } else {
-      out.wgsl = { wgsl_out, num_wgsl_bytes};
+      out.wgsl = { wgsl_out, num_wgsl_bytes - 1};
     }
   }
 
