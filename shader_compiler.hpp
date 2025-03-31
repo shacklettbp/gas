@@ -20,8 +20,6 @@ struct ShaderCompileArgs {
 
   static inline constexpr std::array<ShaderByteCodeType, 4> allTargets {
     ShaderByteCodeType::SPIRV,
-    ShaderByteCodeType::MTLLib,
-    ShaderByteCodeType::DXIL,
     ShaderByteCodeType::WGSL,
   };
   Span<const ShaderByteCodeType> targets = allTargets;

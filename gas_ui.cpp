@@ -189,7 +189,7 @@ static void initWindow(PlatformWindow *window_out,
   i32 os_width = starting_pixel_width;
   i32 os_height = starting_pixel_height;
 
-#if defined(SDL_PLATFORM_MACOS)
+#if defined(SDL_PLATFORM_MACOS) or defined(SDL_PLATFORM_LINUX)
   assert(os_width % 2 == 0);
   assert(os_height % 2 == 0);
 
@@ -563,7 +563,7 @@ bool UIBackend::processEvents()
 
           inputState.mouse_pos_ = { e.motion.x, e.motion.y };
           inputState.mouse_delta_ = { e.motion.xrel, e.motion.yrel };
-#ifdef SDL_PLATFORM_MACOS
+#if defined(SDL_PLATFORM_MACOS) or defined(SDL_PLATFORM_LINUX)
           // macOS reports mouse in half pixel coords for hidpi displays
           inputState.mouse_pos_ *= 2.f;
           inputState.mouse_delta_ *= 2.f;
