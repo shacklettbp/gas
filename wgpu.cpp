@@ -874,6 +874,10 @@ void Backend::createGPUResources(i32 num_buffers,
         .buffer = *buffers.hot(staging.buffer),
       };
 
+      if (depth > 1) {
+        src.layout.rowsPerImage = height;
+      }
+
       wgpu::TexelCopyTextureInfo dst {
         .texture = to_cold->texture,
         .mipLevel = mip_idx,
