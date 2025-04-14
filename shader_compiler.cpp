@@ -424,6 +424,7 @@ ShaderCompileResult CompilerBackend::compileShader(
 
     if (status != webgpu::TintConvertStatus::Success) {
       out.success = false;
+      out.diagnostics = { nullptr, 0 };
       // FIXME
       fprintf(stderr, "%s\n", wgsl_diagnostics);
     } else {

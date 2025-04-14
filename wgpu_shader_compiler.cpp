@@ -43,10 +43,17 @@ GAS_TINT_VIZ TintConvertStatus tintConvertSPIRVToWGSL(
   ()
   {
     std::string wgsl_prog_str = tint::Program::printer(tint_prog);
-    size_t num_bytes = wgsl_prog_str.size() + 1;
+    std::string diag_str = tint_prog.Diagnostics().Str();
+    size_t num_bytes = wgsl_prog_str.size() + diag_str.size() + 3;
 
     *out_diagnostics = (char *)alloc_fn(alloc_data, (int64_t)num_bytes);
-    memcpy(*out_diagnostics, wgsl_prog_str.data(), num_bytes);
+    char *cur_out_diagnostics = *out_diagnostics;
+
+    memcpy(cur_out_diagnostics, wgsl_prog_str.data(), wgsl_prog_str.size() - 1);
+    cur_out_diagnostics += wgsl_prog_str.size() - 1;
+    *cur_out_diagnostics++ = '\n';
+    *cur_out_diagnostics++ = '\n';
+    memcpy(cur_out_diagnostics, diag_str.data(), diag_str.size());
   };
   
   if (tint_prog.Diagnostics().ContainsErrors()) {
