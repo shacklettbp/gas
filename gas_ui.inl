@@ -38,6 +38,11 @@ bool UserInputEvents::upEvent(InputID id) const
   return (events_[id_idx] & (1 << (2 * id_bit + 1))) != 0;
 }
 
+Vector2 UserInputEvents::mouseScroll() const
+{
+  return mouse_scroll_;
+}
+
 inline WindowState & operator|=(WindowState &a, WindowState b)
 {
     a = WindowState(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));

@@ -353,11 +353,14 @@ void UserInputEvents::merge(const UserInputEvents &o)
   for (i32 i = 0; i < (i32)events_.size(); i++) {
     events_[i] |= o.events_[i];
   }
+
+  mouse_scroll_ += o.mouse_scroll_;
 }
 
 void UserInputEvents::clear()
 {
   utils::zeroN<u32>(events_.data(), events_.size());
+  mouse_scroll_ = { 0, 0 };
 }
 
 void UIBackend::enableRawMouseInput(Window *window_base)
@@ -578,6 +581,9 @@ bool UIBackend::processEvents()
           InputID id = sdlMouseButtonToInputID(e.button.button);
           updateInputState(id, e.button.down);
           updateInputEvent(id, false);
+        } break;
+        case SDL_EVENT_MOUSE_WHEEL: {
+          inputEvents.mouse_scroll_ += { e.wheel.x, e.wheel.y };
         } break;
         case SDL_EVENT_KEY_DOWN: {
           PlatformWindow *window = getPlatformWindow(e.key.windowID);

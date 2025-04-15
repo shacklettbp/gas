@@ -61,11 +61,14 @@ public:
   void merge(const UserInputEvents &o);
   void clear();
 
+  inline Vector2 mouseScroll() const;
+
 private:
   static constexpr inline u32 NUM_BITFIELDS =
       2 * utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
 
   std::array<u32, NUM_BITFIELDS> events_;
+  Vector2 mouse_scroll_;
 
 friend struct UIBackend;
 };
