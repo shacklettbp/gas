@@ -453,6 +453,13 @@ struct Surface {
   i32 height;
 };
 
+enum class SwapchainFormat : u32 {
+  SDR_UNorm,
+  SDR_SRGB,
+  HDR_10B,
+  HDR_16B,
+};
+
 struct Swapchain {
   i32 id = 0;
   inline Texture proxyAttachment() const;
@@ -885,6 +892,7 @@ public:
 
   // ==== Swapchain & presentation ============================================
   virtual Swapchain createSwapchain(Surface surface,
+                                    Span<const SwapchainFormat> format_preferences,
                                     SwapchainProperties *properties) = 0;
   virtual void destroySwapchain(Swapchain swapchain) = 0;
   virtual AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain)

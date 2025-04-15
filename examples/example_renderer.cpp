@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
   SwapchainProperties swapchain_properties;
   Swapchain swapchain = gpu->createSwapchain(
-      window->surface, &swapchain_properties);
+      window->surface, { SwapchainFormat::SDR_SRGB }, &swapchain_properties);
 
   GPUQueue main_queue = gpu->getMainQueue();
 

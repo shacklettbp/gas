@@ -328,6 +328,7 @@ public:
   void destroyRasterShaders(i32 num_shaders, RasterShader *handles) final;
 
   Swapchain createSwapchain(Surface surface,
+                            Span<const SwapchainFormat> format_prefrences,
                             SwapchainProperties *properties) final;
   void destroySwapchain(Swapchain swapchain) final;
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;

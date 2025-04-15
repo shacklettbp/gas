@@ -1717,6 +1717,7 @@ void Backend::destroyRasterShaders(i32 num_shaders, RasterShader *handles)
 }
 
 Swapchain Backend::createSwapchain(Surface surface,
+                                   Span<const SwapchainFormat> format_preferences,
                                    SwapchainProperties *properties)
 {
   wgpu::Surface wgpu_surface((WGPUSurface)surface.hdl.ptr);
@@ -1725,7 +1726,67 @@ Swapchain Backend::createSwapchain(Surface surface,
   wgpu_surface.GetCapabilities(adapter, &capabilities);
   bool supports_copy_dst =
     ((u64)capabilities.usages & (u64)wgpu::TextureUsage::CopyDst) != 0;
-  wgpu::TextureFormat format = capabilities.formats[0];
+
+  wgpu::TextureFormat format = wgpu::TextureFormat::Undefined;
+
+  for (i64 pref_idx = 0; pref_idx < format_preferences.size(); pref_idx++) {
+    SwapchainFormat desired_fmt = format_preferences[pref_idx];
+
+    for (i64 format_capability_idx = 0;
+         format_capability_idx < (i64)capabilities.formatCount;
+         format_capability_idx++) {
+      wgpu::TextureFormat capable_format = capabilities.formats[format_capability_idx];
+      bool valid = false;
+
+      switch (desired_fmt) {
+        case SwapchainFormat::SDR_UNorm: {
+          switch (capable_format) {
+            case wgpu::TextureFormat::RGBA8Unorm:
+            case wgpu::TextureFormat::BGRA8Unorm:
+              valid = true;
+            default: break;
+          }
+        } break;
+        case SwapchainFormat::SDR_SRGB: {
+          switch (capable_format) {
+            case wgpu::TextureFormat::RGBA8UnormSrgb:
+            case wgpu::TextureFormat::BGRA8UnormSrgb:
+              valid = true;
+            default: break;
+          }
+        } break;
+        case SwapchainFormat::HDR_10B: {
+          switch (capable_format) {
+            case wgpu::TextureFormat::RGB10A2Uint:
+            case wgpu::TextureFormat::RGB10A2Unorm:
+              valid = true;
+            default: break;
+          }
+        } break;
+        case SwapchainFormat::HDR_16B: {
+          switch (capable_format) {
+            case wgpu::TextureFormat::RGBA16Float:
+              valid = true;
+            default: break;
+          }
+        } break;
+        default: MADRONA_UNREACHABLE();
+      }
+
+      if (valid) {
+        format = capable_format;
+        break;
+      }
+    }
+
+    if (format != wgpu::TextureFormat::Undefined) {
+      break;
+    }
+  }
+
+  if (format == wgpu::TextureFormat::Undefined) {
+    FATAL("Swapchain cannot support any requested format type");
+  }
 
   wgpu::TextureUsage swapchain_usage = wgpu::TextureUsage::RenderAttachment;
   if (supports_copy_dst) {

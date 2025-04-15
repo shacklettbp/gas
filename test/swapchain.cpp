@@ -38,7 +38,7 @@ TEST(UI, ManySwapchains)
   for (i32 i = 0; i < num_windows; i++) {
     SwapchainProperties swapchain_properties;
     swapchains[i] = gpu->createSwapchain(
-        windows[i]->surface, &swapchain_properties);
+        windows[i]->surface, { SwapchainFormat::SDR_SRGB }, &swapchain_properties);
   }
 
   processEvents();
