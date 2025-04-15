@@ -66,11 +66,13 @@ struct UIBackend : public UISystem {
 
   inline Window * createWindow(const char *title,
                                i32 starting_pixel_width,
-                               i32 starting_pixel_height);
+                               i32 starting_pixel_height,
+                               WindowInitFlags flags);
 
   inline Window * createMainWindow(const char *title,
                                    i32 starting_pixel_width,
-                                   i32 starting_pixel_height);
+                                   i32 starting_pixel_height,
+                                   WindowInitFlags flags);
 
   inline void destroyWindow(Window *window);
   inline void destroyMainWindow();
@@ -183,7 +185,8 @@ static void initWindow(PlatformWindow *window_out,
                        GPUAPI *gpu_api,
                        const char *title,
                        i32 starting_pixel_width,
-                       i32 starting_pixel_height)
+                       i32 starting_pixel_height,
+                       WindowInitFlags init_flags)
 {
 #ifdef GAS_USE_SDL
   i32 os_width = starting_pixel_width;
@@ -198,6 +201,14 @@ static void initWindow(PlatformWindow *window_out,
 #endif
 
   SDL_WindowFlags window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+  if ((init_flags & WindowInitFlags::Resizable) != WindowInitFlags::None) {
+    window_flags |= SDL_WINDOW_RESIZABLE;
+  }
+
+  if ((init_flags & WindowInitFlags::Fullscreen) != WindowInitFlags::None) {
+    window_flags |= SDL_WINDOW_FULLSCREEN;
+  }
 
 #if defined(SDL_PLATFORM_LINUX)
   window_flags |= SDL_WINDOW_VULKAN;
@@ -312,22 +323,24 @@ static void cleanupWindow(PlatformWindow *window,
 
 Window * UIBackend::createWindow(const char *title,
                                 i32 starting_pixel_width,
-                                i32 starting_pixel_height)
+                                i32 starting_pixel_height,
+                                WindowInitFlags flags)
 {
   PlatformWindow *window = new PlatformWindow {};
 
   initWindow(window, gpuAPI, title,
-             starting_pixel_width, starting_pixel_height);
+             starting_pixel_width, starting_pixel_height, flags);
 
   return window;
 }
 
 Window * UIBackend::createMainWindow(const char *title,
                                     i32 starting_pixel_width,
-                                    i32 starting_pixel_height)
+                                    i32 starting_pixel_height,
+                                    WindowInitFlags flags)
 {
   initWindow(&mainWindow, gpuAPI, title,
-             starting_pixel_width, starting_pixel_height);
+             starting_pixel_width, starting_pixel_height, flags);
 
 #ifdef GAS_USE_SDL
   mainWindowID = SDL_GetWindowID(mainWindow.os.sdl);
@@ -662,18 +675,20 @@ void UISystem::shutdown() { backend(this)->shutdown(); }
 
 Window * UISystem::createWindow(const char *title,
                                 i32 starting_pixel_width,
-                                i32 starting_pixel_height)
+                                i32 starting_pixel_height,
+                                WindowInitFlags flags)
 {
   return backend(this)->createWindow(
-      title, starting_pixel_width, starting_pixel_height);
+      title, starting_pixel_width, starting_pixel_height, flags);
 }
 
 Window * UISystem::createMainWindow(const char *title,
                                     i32 starting_pixel_width,
-                                    i32 starting_pixel_height)
+                                    i32 starting_pixel_height,
+                                    WindowInitFlags flags)
 {
   return backend(this)->createMainWindow(
-      title, starting_pixel_width, starting_pixel_height);
+      title, starting_pixel_width, starting_pixel_height, flags);
 }
 
 void UISystem::destroyWindow(Window *window)

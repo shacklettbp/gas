@@ -15,6 +15,12 @@ enum class WindowState : u32 {
   IsFocused   = 1 << 1,
 };
 
+enum class WindowInitFlags : u32 {
+  None       = 0,
+  Resizable  = 1 << 0,
+  Fullscreen = 1 << 1,
+};
+
 struct Window {
   i32 pixelWidth;
   i32 pixelHeight;
@@ -88,11 +94,13 @@ public:
 
   Window * createWindow(const char *title,
                         i32 starting_pixel_width,
-                        i32 starting_pixel_height);
+                        i32 starting_pixel_height,
+                        WindowInitFlags flags = WindowInitFlags::None);
 
   Window * createMainWindow(const char *title,
                             i32 starting_pixel_width,
-                            i32 starting_pixel_height);
+                            i32 starting_pixel_height,
+                            WindowInitFlags flags = WindowInitFlags::None);
 
   void destroyWindow(Window *window);
   void destroyMainWindow();
@@ -118,6 +126,11 @@ inline WindowState & operator|=(WindowState &a, WindowState b);
 inline WindowState operator|(WindowState a, WindowState b);
 inline WindowState & operator&=(WindowState &a, WindowState b);
 inline WindowState operator&(WindowState a, WindowState b);
+
+inline WindowInitFlags & operator|=(WindowInitFlags &a, WindowInitFlags b);
+inline WindowInitFlags operator|(WindowInitFlags a, WindowInitFlags b);
+inline WindowInitFlags & operator&=(WindowInitFlags &a, WindowInitFlags b);
+inline WindowInitFlags operator&(WindowInitFlags a, WindowInitFlags b);
 
 }
 
