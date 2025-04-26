@@ -1,6 +1,6 @@
 namespace gas {
 
-Span<const ParamBlockTypeInit>
+brt::Span<const ParamBlockTypeInit>
   ShaderParamBlockReflectionResult::getParamBlocksForBackend(
     ShaderByteCodeType bytecode_type)
 {
@@ -9,7 +9,7 @@ Span<const ParamBlockTypeInit>
     case ShaderByteCodeType::MTLLib: return mtl;
     case ShaderByteCodeType::DXIL: return dxil;
     case ShaderByteCodeType::WGSL: return wgsl;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -21,7 +21,7 @@ ShaderByteCode ShaderCompileResult::getByteCodeForBackend(
     case ShaderByteCodeType::MTLLib: return mtl;
     case ShaderByteCodeType::DXIL: return dxil;
     case ShaderByteCodeType::WGSL: return wgsl;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 

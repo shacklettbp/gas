@@ -1,8 +1,8 @@
 #include "gas_ui.hpp"
-#include <madrona/crash.hpp>
-#include <madrona/heap_array.hpp>
 
-#include <cassert>
+#include <brt/err.hpp>
+
+#include <vector>
 
 #ifdef GAS_USE_SDL
 #include <SDL3/SDL.h>
@@ -28,6 +28,8 @@
 #endif
 
 namespace gas {
+
+using namespace brt;
 
 namespace {
 
@@ -139,16 +141,16 @@ UISystem * UISystem::init(const Config &cfg)
   initUIBackendAPI();
 
   GPUAPISelect api_select;
-  if (!cfg.desiredGPUAPI.has_value()) {
+  if (cfg.desiredGPUAPI == GPUAPISelect::None) {
     api_select = InitSystem::autoSelectAPI();
   } else {
-    api_select = *cfg.desiredGPUAPI;
+    api_select = cfg.desiredGPUAPI;
   }
 
   // FIXME:
   GPULib *gpu_lib = nullptr;
 
-  HeapArray<const char *> api_exts(0);
+  std::vector<const char *> api_exts;
 
   GPUAPI *gpu_api = InitSystem::initAPI(api_select, gpu_lib, {
     .enableValidation = cfg.enableValidation,
@@ -193,8 +195,8 @@ static void initWindow(PlatformWindow *window_out,
   i32 os_height = starting_pixel_height;
 
 #if defined(SDL_PLATFORM_MACOS) or defined(SDL_PLATFORM_LINUX)
-  assert(os_width % 2 == 0);
-  assert(os_height % 2 == 0);
+  chk(os_width % 2 == 0);
+  chk(os_height % 2 == 0);
 
   os_width = os_width / 2;
   os_height = os_height / 2;
@@ -372,7 +374,7 @@ void UserInputEvents::merge(const UserInputEvents &o)
 
 void UserInputEvents::clear()
 {
-  utils::zeroN<u32>(events_.data(), events_.size());
+  zeroN<u32>(events_.data(), events_.size());
   mouse_scroll_ = { 0, 0 };
 }
 
@@ -426,7 +428,7 @@ void UIBackend::endTextEntry(Window *window_base)
   PlatformWindow *window = (PlatformWindow *)window_base;
 #ifdef GAS_USE_SDL
   SDL_Window *sdl_hdl = window->os.sdl;
-  assert(SDL_TextInputActive(sdl_hdl));
+  chk(SDL_TextInputActive(sdl_hdl));
   REQ_SDL(SDL_StopTextInput(sdl_hdl));
 #endif
 }

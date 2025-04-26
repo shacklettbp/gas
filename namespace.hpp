@@ -3,33 +3,23 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include <brt/types.hpp>
+
 namespace gas {
 
-using u32 = uint32_t;
-using i32 = int32_t;
-using u64 = uint64_t;
-using i64 = int64_t;
-using u16 = uint16_t;
-using i16 = int16_t;
+using brt::u32;
+using brt::i32;
+using brt::u64;
+using brt::i64;
+using brt::u16;
+using brt::i16;
+using brt::u8;
+using brt::i8;
+using brt::f32;
 
-inline constexpr u32 operator "" _u32(unsigned long long v) 
-{ 
-    return uint32_t(v);
-}
-
-inline constexpr u64 operator "" _u64(unsigned long long v) 
-{ 
-    return uint64_t(v);
-}
-
-inline constexpr i32 operator "" _i32(unsigned long long v) 
-{ 
-    return int32_t(v);
-}
-
-inline constexpr i64 operator "" _i64(unsigned long long v) 
-{ 
-    return int64_t(v);
-}
+using brt::operator""_u32;
+using brt::operator""_u64;
+using brt::operator""_i32;
+using brt::operator""_i64;
 
 }

@@ -4,9 +4,8 @@
 #include "gas_fwd.hpp"
 #include "uuid.hpp"
 
-#include <madrona/stack_alloc.hpp>
-
-#include <cassert>
+#include <brt/math.hpp>
+#include <brt/err.hpp>
 
 namespace gas {
 
@@ -15,7 +14,7 @@ struct APIConfig {
   bool debugPipelineCompilation = false;
   bool runtimeErrorsAreFatal = false;
   bool enablePresent = false;
-  Span<const char *const> apiExtensions = {};
+  brt::Span<const char *const> apiExtensions = {};
 };
 
 // Constants
@@ -169,15 +168,15 @@ struct TextureInit {
 };
 
 struct GPUResourcesCreate {
-  Span<const BufferInit> buffers = {};
-  Span<Buffer> buffersOut = {};
-  Span<const TextureInit> textures = {};
-  Span<Texture> texturesOut = {};
+  brt::Span<const BufferInit> buffers = {};
+  brt::Span<Buffer> buffersOut = {};
+  brt::Span<const TextureInit> textures = {};
+  brt::Span<Texture> texturesOut = {};
 };
 
 struct GPUResourcesDestroy {
-  Span<const Buffer> buffers = {};
-  Span<const Texture> textures = {};
+  brt::Span<const Buffer> buffers = {};
+  brt::Span<const Texture> textures = {};
 };
 
 // Sampler setup
@@ -278,9 +277,9 @@ struct SamplerBindingConfig {
 
 struct ParamBlockTypeInit {
   UUID uuid;
-  Span<const BufferBindingConfig> buffers = {};
-  Span<const TextureBindingConfig> textures = {};
-  Span<const SamplerBindingConfig> samplers = {};
+  brt::Span<const BufferBindingConfig> buffers = {};
+  brt::Span<const TextureBindingConfig> textures = {};
+  brt::Span<const SamplerBindingConfig> samplers = {};
 };
 
 struct BufferBinding {
@@ -291,9 +290,9 @@ struct BufferBinding {
 
 struct ParamBlockInit {
   ParamBlockTypeID typeID;
-  Span<const BufferBinding> buffers = {};
-  Span<const Texture> textures = {};
-  Span<const Sampler> samplers = {};
+  brt::Span<const BufferBinding> buffers = {};
+  brt::Span<const Texture> textures = {};
+  brt::Span<const Sampler> samplers = {};
 };
 
 // Creating Raster Pass
@@ -330,19 +329,19 @@ struct ColorAttachmentConfig {
   TextureFormat format;
   AttachmentLoadMode loadMode = AttachmentLoadMode::Clear;
   AttachmentStoreMode storeMode = AttachmentStoreMode::Store;
-  Vector4 clearValue = Vector4::zero();
+  brt::Vector4 clearValue = brt::Vector4::zero();
 };
 
 struct RasterPassInterfaceInit {
   UUID uuid;
   DepthAttachmentConfig depthAttachment = {};
-  Span<const ColorAttachmentConfig> colorAttachments = {};
+  brt::Span<const ColorAttachmentConfig> colorAttachments = {};
 };
 
 struct RasterPassInit {
   RasterPassInterface interface;
   Texture depthAttachment = {};
-  Span<const Texture> colorAttachments = {};
+  brt::Span<const Texture> colorAttachments = {};
 };
 
 // Creating shaders
@@ -373,7 +372,7 @@ struct VertexAttributeConfig {
 
 struct VertexBufferConfig {
   u32 stride;
-  Span<const VertexAttributeConfig> attributes;
+  brt::Span<const VertexAttributeConfig> attributes;
 };
 
 enum class DepthCompare : u16 {
@@ -425,7 +424,7 @@ struct RasterHWConfig {
   float depthBiasSlope = 0.f;
   float depthBiasClamp = 0.f;
   CullMode cullMode = CullMode::BackFace;
-  Span<const BlendingConfig> blending = {};
+  brt::Span<const BlendingConfig> blending = {};
 };
 
 struct RasterShaderInit {
@@ -433,16 +432,16 @@ struct RasterShaderInit {
   const char *vertexEntry;
   const char *fragmentEntry;
   RasterPassInterfaceID rasterPass;
-  Span<const ParamBlockTypeID> paramBlockTypes = {};
+  brt::Span<const ParamBlockTypeID> paramBlockTypes = {};
   uint32_t numPerDrawBytes = 0;
-  Span<const VertexBufferConfig> vertexBuffers = {};
+  brt::Span<const VertexBufferConfig> vertexBuffers = {};
   RasterHWConfig rasterConfig = {};
 };
 
 struct ComputeShaderInit {
-  Span<const uint8_t> byteCode;
+  brt::Span<const uint8_t> byteCode;
   const char *entry;
-  Span<const ParamBlockTypeID> paramBlockTypes = {};
+  brt::Span<const ParamBlockTypeID> paramBlockTypes = {};
 };
 
 // Presenting Handles
@@ -892,7 +891,7 @@ public:
 
   // ==== Swapchain & presentation ============================================
   virtual Swapchain createSwapchain(Surface surface,
-                                    Span<const SwapchainFormat> format_preferences,
+                                    brt::Span<const SwapchainFormat> format_preferences,
                                     SwapchainProperties *properties) = 0;
   virtual void destroySwapchain(Swapchain swapchain) = 0;
   virtual AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain)
@@ -938,7 +937,7 @@ public:
   virtual void destroySurface(Surface surface) = 0;
 
   virtual GPURuntime * createRuntime(
-    i32 gpu_idx, Span<const Surface> surfaces = {}) = 0;
+    i32 gpu_idx, brt::Span<const Surface> surfaces = {}) = 0;
   virtual void destroyRuntime(GPURuntime *runtime) = 0;
 
   virtual ShaderByteCodeType backendShaderByteCodeType() = 0;

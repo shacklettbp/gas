@@ -1,7 +1,5 @@
 #include "shader_compiler.hpp"
 
-#include <madrona/stack_alloc.hpp>
-
 #include <slang.h>
 
 #include <cstdio>
@@ -14,9 +12,11 @@ using namespace slang;
 
 #define REQ_SLANG(expr) \
     ::gas::checkSlang((expr), __FILE__, __LINE__,\
-                                  MADRONA_COMPILER_FUNCTION_NAME)
+                                  BRT_COMPILER_FUNCTION_NAME)
 
 namespace gas {
+
+using namespace brt;
 
 ShaderCompiler::~ShaderCompiler() = default;
 
@@ -188,13 +188,13 @@ Span<const char> copyOutDiagnostics(StackAlloc &alloc,
   size_t num_bytes = diagnostics_len + 1;
   char *diagnostics_out = alloc.allocN<char>(num_bytes);
   memcpy(diagnostics_out, diagnostics, num_bytes);
-  return { diagnostics_out, (CountT)num_bytes };
+  return { diagnostics_out, (i64)num_bytes };
 }
 
 [[maybe_unused]] const char * debugSlangParameterCategoryName(
     ParameterCategory category)
 {
-#define CASE_STR(e) case e: return MADRONA_STRINGIFY(e)
+#define CASE_STR(e) case e: return BRT_STRINGIFY(e)
 
   switch (category) {
     CASE_STR(None);
@@ -251,7 +251,7 @@ Span<const ParamBlockTypeInit> reflectParameterBlocksForTarget(
     size_t param_binding_idx = param->getBindingSpace() +
         param->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
     i32 param_start_offset = param->getBindingIndex();
-    assert(param_start_offset == 0);
+    chk(param_start_offset == 0);
 
     printf("%s: %d %d\n", param->getName(),
            param_binding_idx, param_start_offset);
@@ -407,7 +407,7 @@ ShaderCompileResult CompilerBackend::compileShader(
   }
 
   if (request_cfg.wgslOut) {
-    assert(request_cfg.spirvIDX != -1);
+    chk(request_cfg.spirvIDX != -1);
 
     auto alloc_wrapper = [](void *to_stack_alloc, i64 num_bytes) {
       StackAlloc &alloc = *(StackAlloc *)to_stack_alloc;
@@ -443,9 +443,9 @@ ShaderCompileResult CompilerBackend::compileShader(
 extern "C" {
 
 #ifdef gas_shader_compiler_EXPORTS
-#define GAS_SHADER_COMPILER_VIS MADRONA_EXPORT
+#define GAS_SHADER_COMPILER_VIS BRT_EXPORT
 #else
-#define GAS_SHADER_COMPILER_VIS MADRONA_IMPORT
+#define GAS_SHADER_COMPILER_VIS BRT_IMPORT
 #endif
 
 GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler * gasCreateShaderCompiler()

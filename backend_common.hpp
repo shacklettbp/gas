@@ -4,8 +4,8 @@
 #include "gas.hpp"
 #include "mem.hpp"
 
-#include <madrona/utils.hpp>
-#include <madrona/macros.hpp>
+#include <brt/macros.hpp>
+#include <brt/utils.hpp>
 
 #include <cstdio>
 #include <cassert>
@@ -24,7 +24,7 @@ inline u32 bytesPerTexelForFormat(TextureFormat fmt)
     case BGRA8_SRGB:
         return 4;
     case Depth32_Float: return 4;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -37,8 +37,8 @@ struct ResourceTable {
   {
     constexpr i32 num_hot_bytes = (i32)sizeof(Hot) + (i32)sizeof(u16);
 
-    constexpr i32 desired_chunk_size = utils::roundUp(
-      std::max(MADRONA_CACHE_LINE, num_hot_bytes), MADRONA_CACHE_LINE);
+    constexpr i32 desired_chunk_size = brt::roundToAlignment(
+      std::max(BRT_CACHE_LINE, num_hot_bytes), BRT_CACHE_LINE);
 
     constexpr i32 elems_per_chunk = desired_chunk_size / num_hot_bytes;
 
@@ -48,14 +48,14 @@ struct ResourceTable {
 
   static constexpr inline i32 CHUNK_SIZE = computeChunkSize();
   static constexpr inline i32 NUM_HOT_CHUNKS = 
-    utils::divideRoundUp(MAX_NUM_ELEMS, CHUNK_SIZE);
+    brt::roundToAlignment(MAX_NUM_ELEMS, CHUNK_SIZE);
 
-  struct alignas(MADRONA_CACHE_LINE) HotChunk {
+  struct alignas(BRT_CACHE_LINE) HotChunk {
     Hot hot[CHUNK_SIZE];
     u16 gen[CHUNK_SIZE];
   };
 
-  static_assert(sizeof(HotChunk) % MADRONA_CACHE_LINE == 0);
+  static_assert(sizeof(HotChunk) % BRT_CACHE_LINE == 0);
 
   union ColdDataAndFreeList {
     Cold data;

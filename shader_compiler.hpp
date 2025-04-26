@@ -1,9 +1,10 @@
 #pragma once
 
-#include <madrona/macros.hpp>
-
 #include "namespace.hpp"
 #include "gas.hpp"
+
+#include <brt/span.hpp>
+#include <brt/stack_alloc.hpp>
 
 namespace gas {
 
@@ -15,26 +16,26 @@ struct ShaderMacroDefinition {
 struct ShaderCompileArgs {
   const char *path;
   const char *str = nullptr; 
-  Span<const char *const> includeDirs = {};
-  Span<const ShaderMacroDefinition> macroDefinitions = {};
+  brt::Span<const char *const> includeDirs = {};
+  brt::Span<const ShaderMacroDefinition> macroDefinitions = {};
 
-  static inline constexpr std::array<ShaderByteCodeType, 4> allTargets {
+  static inline constexpr auto allTargets = std::to_array({
     ShaderByteCodeType::SPIRV,
     ShaderByteCodeType::WGSL,
-  };
-  Span<const ShaderByteCodeType> targets = allTargets;
+  });
+  brt::Span<const ShaderByteCodeType> targets = allTargets;
 };
 
 struct ShaderParamBlockReflectionResult {
-  Span<const ParamBlockTypeInit> spirv;
-  Span<const ParamBlockTypeInit> mtl;
-  Span<const ParamBlockTypeInit> dxil;
-  Span<const ParamBlockTypeInit> wgsl;
+  brt::Span<const ParamBlockTypeInit> spirv;
+  brt::Span<const ParamBlockTypeInit> mtl;
+  brt::Span<const ParamBlockTypeInit> dxil;
+  brt::Span<const ParamBlockTypeInit> wgsl;
 
-  Span<const char> diagnostics;
+  brt::Span<const char> diagnostics;
   bool success;
 
-  inline Span<const ParamBlockTypeInit> getParamBlocksForBackend(
+  inline brt::Span<const ParamBlockTypeInit> getParamBlocksForBackend(
       ShaderByteCodeType bytecode_type);
 };
 
@@ -44,7 +45,7 @@ struct ShaderCompileResult {
   ShaderByteCode dxil;
   ShaderByteCode wgsl;
 
-  Span<const char> diagnostics;
+  brt::Span<const char> diagnostics;
   bool success;
 
   inline ShaderByteCode getByteCodeForBackend(
@@ -56,10 +57,10 @@ public:
   virtual ~ShaderCompiler() = 0;
 
   virtual ShaderParamBlockReflectionResult paramBlockReflection(
-      StackAlloc &alloc, ShaderCompileArgs args) = 0;
+      brt::StackAlloc &alloc, ShaderCompileArgs args) = 0;
 
   virtual ShaderCompileResult compileShader(
-      StackAlloc &alloc, ShaderCompileArgs args) = 0;
+      brt::StackAlloc &alloc, ShaderCompileArgs args) = 0;
 };
 
 }
@@ -67,9 +68,9 @@ public:
 extern "C" {
 
 #ifdef gas_shader_compiler_EXPORTS
-#define GAS_SHADER_COMPILER_VIS MADRONA_EXPORT
+#define GAS_SHADER_COMPILER_VIS BRT_EXPORT
 #else
-#define GAS_SHADER_COMPILER_VIS MADRONA_IMPORT
+#define GAS_SHADER_COMPILER_VIS BRT_IMPORT
 #endif
 GAS_SHADER_COMPILER_VIS ::gas::ShaderCompiler *
     gasCreateShaderCompiler();

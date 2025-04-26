@@ -1,8 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <madrona/dyn_array.hpp>
-#include <madrona/optional.hpp>
 
 #include "gas.hpp"
 #include "init.hpp"
@@ -41,18 +39,18 @@ enum class InputID : u32 {
 
 class UserInput {
 public:
-  inline Vector2 mousePosition() const;
-  inline Vector2 mouseDelta() const;
+  inline brt::Vector2 mousePosition() const;
+  inline brt::Vector2 mouseDelta() const;
 
   inline bool isDown(InputID id) const;
   inline bool isUp(InputID id) const;
 
 private:
   static constexpr inline u32 NUM_BITFIELDS =
-      utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
+      brt::roundToAlignment((u32)InputID::NUM_IDS, 32_u32);
 
-  Vector2 mouse_pos_;
-  Vector2 mouse_delta_;
+  brt::Vector2 mouse_pos_;
+  brt::Vector2 mouse_delta_;
 
   std::array<u32, NUM_BITFIELDS> states_;
 
@@ -67,14 +65,14 @@ public:
   void merge(const UserInputEvents &o);
   void clear();
 
-  inline Vector2 mouseScroll() const;
+  inline brt::Vector2 mouseScroll() const;
 
 private:
   static constexpr inline u32 NUM_BITFIELDS =
-      2 * utils::divideRoundUp((u32)InputID::NUM_IDS, 32_u32);
+      2 * brt::roundToAlignment((u32)InputID::NUM_IDS, 32_u32);
 
   std::array<u32, NUM_BITFIELDS> events_;
-  Vector2 mouse_scroll_;
+  brt::Vector2 mouse_scroll_;
 
 friend struct UIBackend;
 };
@@ -85,8 +83,7 @@ public:
     bool enableValidation = false;
     bool debugPipelineCompilation = false;
     bool runtimeErrorsAreFatal = false;
-    Optional<GPUAPISelect> desiredGPUAPI =
-      Optional<GPUAPISelect>::none();
+    GPUAPISelect desiredGPUAPI = GPUAPISelect::None;
   };
 
   static UISystem * init(const Config &cfg);
@@ -110,7 +107,7 @@ public:
   void enableRawMouseInput(Window *window);
   void disableRawMouseInput(Window *window);
 
-  void beginTextEntry(Window *window, Vector2 pos, float line_height);
+  void beginTextEntry(Window *window, brt::Vector2 pos, f32 line_height);
   void endTextEntry(Window *window);
 
   bool processEvents();

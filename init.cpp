@@ -4,13 +4,9 @@
 #include "wgpu_init.hpp"
 #endif
 
-#include <madrona/macros.hpp>
-
-#include <cassert>
-
-#if defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
+#if defined(BRT_LINUX) or defined(BRT_MACOS)
 #include <dlfcn.h>
-#elif defined(MADRONA_WINDOWS)
+#elif defined(BRT_WINDOWS)
 #include "windows.hpp"
 #endif
 
@@ -30,7 +26,7 @@ GPULib * loadAPILib(GPUAPISelect api_select)
     return webgpu::loadWebGPULib();
   } break;
   default: {
-    MADRONA_UNREACHABLE();
+    BRT_UNREACHABLE();
   } break;
   }
 }
@@ -49,14 +45,14 @@ GPUAPI * initAPI(GPUAPISelect chosen_api,
     return webgpu::initWebGPU(lib, cfg);
   } break;
   default: {
-    MADRONA_UNREACHABLE();
+    BRT_UNREACHABLE();
   } break;
   }
 }
 
 ShaderCompilerLib loadShaderCompiler()
 {
-#if defined(MADRONA_WINDOWS)
+#if defined(BRT_WINDOWS)
   const char *lib_name = "gas_shader_compiler.dll";
 
   void *handle = LoadLibraryExA(
@@ -87,8 +83,8 @@ ShaderCompilerLib loadShaderCompiler()
 
   // Return the handle and the create function
   return { handle, create_fn, destroy_fn };
-#elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
-#ifdef MADRONA_LINUX
+#elif defined(BRT_LINUX) or defined(BRT_MACOS)
+#ifdef BRT_LINUX
   const char *lib_name = "libgas_shader_compiler.so";
 #else
   const char *lib_name = "libgas_shader_compiler.dylib";
@@ -125,7 +121,7 @@ ShaderCompilerLib loadShaderCompiler()
 
 void unloadShaderCompiler(ShaderCompilerLib compiler_lib)
 {
-#if defined(MADRONA_WINDOWS)
+#if defined(BRT_WINDOWS)
   auto shutdown_fn = (void (*)())GetProcAddress(
       compiler_lib.hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {
@@ -136,7 +132,7 @@ void unloadShaderCompiler(ShaderCompilerLib compiler_lib)
   if (!FreeLibrary(compiler_lib.hdl)) {
     FATAL("Failed to unload shader compiler library: %u", GetLastError());
   }
-#elif defined(MADRONA_LINUX) or defined(MADRONA_MACOS)
+#elif defined(BRT_LINUX) or defined(BRT_MACOS)
   auto shutdown_fn = (void (*)())dlsym(
       compiler_lib.hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {

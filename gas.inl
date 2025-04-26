@@ -123,7 +123,7 @@ void CommandWriter::ctrl(GPURuntime *gpu, CommandCtrl ctrl)
 
 u32 GPUTmpMemBlock::alloc(u32 num_bytes, u32 alignment)
 {
-  u32 start = utils::roundUp(offset, alignment);
+  u32 start = brt::roundToAlignment(offset, alignment);
   offset = start + num_bytes;
   return start;
 }
@@ -170,7 +170,7 @@ void RasterPassEncoder::setShader(RasterShader shader)
 
 void RasterPassEncoder::setParamBlock(i32 idx, ParamBlock param_block)
 {
-  assert(idx >= 0 && idx <= 2);
+  chk(idx >= 0 && idx <= 2);
   if (state_.paramBlocks[idx] == param_block) {
     return;
   }
@@ -181,7 +181,7 @@ void RasterPassEncoder::setParamBlock(i32 idx, ParamBlock param_block)
 
 void RasterPassEncoder::setVertexBuffer(i32 idx, Buffer buffer)
 {
-  assert(idx >= 0 && idx < 2);
+  chk(idx >= 0 && idx < 2);
 
   if (state_.vertexBuffer[idx] == buffer) {
     return;
@@ -259,7 +259,7 @@ u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes, u32 alignment)
       state_.dataBuffer = gpu_input_.buffer;
     }
 
-    offset = utils::roundUp(gpu_input_.offset, alignment);
+    offset = brt::roundToAlignment(gpu_input_.offset, alignment);
     gpu_input_.offset = offset + num_bytes;
   }
 
@@ -583,7 +583,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
   if (tmp_staging_.blockFull()) [[unlikely]] {
     tmp_staging_ = gpu_->allocGPUTmpStagingBlock(queue_);
 
-    offset = utils::roundUp(tmp_staging_.offset, alignment);
+    offset = brt::roundToAlignment(tmp_staging_.offset, alignment);
     tmp_staging_.offset = offset + num_bytes;
   }
 
@@ -714,8 +714,8 @@ void GPURuntime::destroyTextures(i32 num_textures, Texture *textures)
 void GPURuntime::createGPUResources(GPUResourcesCreate create,
                                     GPUQueue tx_queue)
 {
-  assert(create.buffers.size() == create.buffersOut.size());
-  assert(create.textures.size() == create.texturesOut.size());
+  chk(create.buffers.size() == create.buffersOut.size());
+  chk(create.textures.size() == create.texturesOut.size());
 
   createGPUResources((i32)create.buffers.size(),
                      create.buffers.data(),

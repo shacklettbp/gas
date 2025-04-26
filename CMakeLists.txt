@@ -10,12 +10,13 @@ if (NOT PROJECT_NAME)
   endif()
 
   project(gas LANGUAGES ${LANGS})
+
+  include(sys-detect)
+  include(cxx-setup)
 endif()
 
 add_subdirectory(deps)
 
-include(sys-detect)
-include(cxx-setup)
 include(gas-find-deps)
 
 list(APPEND GAS_CORE_SOURCES
@@ -26,7 +27,7 @@ list(APPEND GAS_CORE_SOURCES
   linux.hpp windows.hpp
 )
 
-if (GAS_USE_DAWN)
+if (GAS_USE_DAWN OR EMSCRIPTEN)
   list(APPEND GAS_CORE_SOURCES
     wgpu.hpp wgpu.cpp wgpu_init.hpp
   )
@@ -36,8 +37,14 @@ add_library(gas_core STATIC
   ${GAS_CORE_SOURCES}
 )
 
+target_link_libraries(gas_core PRIVATE brt)
+
 if (GAS_USE_DAWN)
   target_link_libraries(gas_core PRIVATE gas_dawn)
+elseif (EMSCRIPTEN)
+  target_compile_definitions(gas_core PRIVATE 
+    GAS_SUPPORT_WEBGPU=1
+  )
 endif()
 
 add_library(gas_ui STATIC
@@ -45,7 +52,7 @@ add_library(gas_ui STATIC
 )
 
 target_link_libraries(gas_ui PRIVATE
-  gas_core
+  gas_core brt
 )
 
 if (GAS_USE_SDL)
@@ -64,48 +71,52 @@ target_link_libraries(gas_imgui
   PUBLIC
     gas_imgui_hdrs
   PRIVATE
-    gas_core gas_ui gas_imgui_impl
+    gas_core gas_ui gas_imgui_impl brt
 )
 
-add_library(gas_shader_compiler SHARED
-  shader_compiler.hpp shader_compiler.inl shader_compiler.cpp
-)
-target_link_libraries(gas_shader_compiler PRIVATE
-  gas_slang
-)
-
-function(gas_link_hermetic_libcxx tgt)
-  FetchContent_GetProperties(MadronaBundledToolchain)
-
-  set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
-
-  target_compile_options(${tgt} PRIVATE -nostdinc++ -nostdlib++)
-  target_link_options(${tgt} PRIVATE -nostdlib++)
-  target_include_directories(${tgt} SYSTEM PRIVATE
-    $<BUILD_INTERFACE:${HERMETIC_LIBCXX_PATH}/include/c++/v1>)
-  target_link_libraries(${tgt} PRIVATE
-    ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a
+if (NOT EMSCRIPTEN)
+  add_library(gas_shader_compiler SHARED
+    shader_compiler.hpp shader_compiler.inl shader_compiler.cpp
   )
-endfunction()
-
-if (GAS_USE_DAWN)
-  add_library(gas_dawn_tint SHARED
-    wgpu_shader_compiler.hpp
-    wgpu_shader_compiler.cpp
+  target_link_libraries(gas_shader_compiler PRIVATE
+    gas_slang
   )
-  target_link_libraries(gas_dawn_tint PRIVATE 
-    gas_dawn
-    gas_dawn_tint_libs
-  )
-
-  if (WIN32)
-    set_property(TARGET gas_dawn_tint PROPERTY
-      MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
-  elseif(NOT EMPSCRIPTEN)
-    gas_link_hermetic_libcxx(gas_dawn_tint)
+  
+  function(gas_link_hermetic_libcxx tgt)
+    FetchContent_GetProperties(MadronaBundledToolchain)
+  
+    set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
+  
+    target_compile_options(${tgt} PRIVATE -nostdinc++ -nostdlib++)
+    target_link_options(${tgt} PRIVATE -nostdlib++)
+    target_include_directories(${tgt} SYSTEM PRIVATE
+      $<BUILD_INTERFACE:${HERMETIC_LIBCXX_PATH}/include/c++/v1>)
+    target_link_libraries(${tgt} PRIVATE
+      ${HERMETIC_LIBCXX_PATH}/lib/libc++-hermetic.a
+    )
+  endfunction()
+  
+  if (GAS_USE_DAWN)
+    add_library(gas_dawn_tint SHARED
+      wgpu_shader_compiler.hpp
+      wgpu_shader_compiler.cpp
+    )
+    target_link_libraries(gas_dawn_tint PRIVATE 
+      gas_dawn
+      gas_dawn_tint_libs
+      brt-hdrs
+    )
+  
+    if (WIN32)
+      set_property(TARGET gas_dawn_tint PROPERTY
+        MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    elseif(NOT EMPSCRIPTEN)
+      gas_link_hermetic_libcxx(gas_dawn_tint)
+    endif()
+  
+    target_link_libraries(gas_shader_compiler PRIVATE
+      gas_dawn gas_dawn_tint brt)
   endif()
-
-  target_link_libraries(gas_shader_compiler PRIVATE gas_dawn gas_dawn_tint)
 endif()
 
 add_subdirectory(examples)

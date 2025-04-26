@@ -2,6 +2,8 @@
 
 #include "namespace.hpp"
 
+#include <brt/utils.hpp>
+
 namespace gas {
 
 // Note these aren't any kind of standardized UUIDs. Just 128 bit random values
@@ -118,7 +120,7 @@ constexpr UUID UUID::randomFromSeedString(const char *str, size_t size)
     return (x << r) | (x >> (64 - r));
   };
 
-  u64 rounded_size = roundToAlignment((u64)size, (u64)16);
+  u64 rounded_size = brt::roundToAlignment((u64)size, (u64)16);
   for (u64 i = 0; i < rounded_size; i += 16) {
     uint64_t k1 = 0;
     for (size_t j = 0; j < 8; j++) {

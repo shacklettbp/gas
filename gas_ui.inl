@@ -1,11 +1,11 @@
 namespace gas {
 
-Vector2 UserInput::mousePosition() const
+brt::Vector2 UserInput::mousePosition() const
 {
   return mouse_pos_;
 }
 
-Vector2 UserInput::mouseDelta() const
+brt::Vector2 UserInput::mouseDelta() const
 {
   return mouse_delta_;
 }
@@ -38,7 +38,7 @@ bool UserInputEvents::upEvent(InputID id) const
   return (events_[id_idx] & (1 << (2 * id_bit + 1))) != 0;
 }
 
-Vector2 UserInputEvents::mouseScroll() const
+brt::Vector2 UserInputEvents::mouseScroll() const
 {
   return mouse_scroll_;
 }

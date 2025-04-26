@@ -16,9 +16,7 @@ if (GAS_USE_SDL)
 endif()
 
 
-set(GAS_USE_DAWN TRUE)
-
-set(GAS_USE_DAWN "${GAS_USE_DAWN}" PARENT_SCOPE)
+option(GAS_USE_DAWN "GAS use Dawn for native WebGPU support" TRUE)
 
 if (GAS_USE_DAWN)
   include(setup-dawn.cmake)

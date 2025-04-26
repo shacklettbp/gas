@@ -2,7 +2,6 @@
 #include "backend_common.hpp"
 
 #include <madrona/rand.hpp>
-#include <madrona/dyn_array.hpp>
 
 #include <gtest/gtest.h>
 

@@ -1,12 +1,12 @@
 #pragma once
 #include <cstdint>
 
-#include <madrona/macros.hpp>
+#include <brt/macros.hpp>
 
 #ifdef gas_dawn_tint_EXPORTS
-#define GAS_TINT_VIZ MADRONA_EXPORT
+#define GAS_TINT_VIZ BRT_EXPORT
 #else
-#define GAS_TINT_VIZ MADRONA_IMPORT
+#define GAS_TINT_VIZ BRT_IMPORT
 #endif
 
 namespace gas::webgpu {

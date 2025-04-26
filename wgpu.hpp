@@ -5,7 +5,7 @@
 
 #include <webgpu/webgpu_cpp.h>
 
-#include <madrona/sync.hpp>
+#include <brt/sync.hpp>
 
 namespace gas::webgpu {
 
@@ -45,7 +45,7 @@ struct BackendColorAttachmentConfig {
   wgpu::TextureFormat format;
   wgpu::LoadOp loadOp;
   wgpu::StoreOp storeOp;
-  math::Vector4 clearValue;
+  brt::Vector4 clearValue;
 };
 
 struct BackendRasterPassConfig {
@@ -65,7 +65,7 @@ struct BackendColorAttachment {
   wgpu::TextureView view;
   wgpu::LoadOp loadOp;
   wgpu::StoreOp storeOp;
-  math::Vector4 clearValue;
+  brt::Vector4 clearValue;
 };
 
 // FIXME: this will be gigantic
@@ -107,7 +107,7 @@ struct StagingBelt {
 
   u32 stagingBufferHandlesBase;
 
-  SpinLock lock;
+  alignas(BRT_CACHE_LINE) u32 lock;
 };
 
 struct GPUTmpInputState {
@@ -118,17 +118,17 @@ struct GPUTmpInputState {
 
   std::array<i32, MAX_TMP_BUFFERS_PER_QUEUE> gpuTmpInputStagingBuffers;
 
-  alignas(MADRONA_CACHE_LINE) u64 curTmpStagingRange;
-  alignas(MADRONA_CACHE_LINE) u64 curTmpInputRange;
+  alignas(BRT_CACHE_LINE) u64 curTmpStagingRange;
+  alignas(BRT_CACHE_LINE) u64 curTmpInputRange;
   u32 maxNumUsedTmpGPUBuffers;
 
   u32 tmpBufferHandlesBase;
 
-  SpinLock lock {};
+  alignas(BRT_CACHE_LINE) u32 lock;
 };
 
 struct TmpParamBlockState {
-  alignas(MADRONA_CACHE_LINE) u32 numLive;
+  alignas(BRT_CACHE_LINE) u32 numLive;
   u32 baseHandleOffset;
 };
 
@@ -151,7 +151,7 @@ public:
   void destroySurface(Surface surface) final;
 
   GPURuntime * createRuntime(
-      i32 gpu_idx, Span<const Surface> surfaces) final;
+      i32 gpu_idx, brt::Span<const Surface> surfaces) final;
   void destroyRuntime(GPURuntime *runtime) final;
 
   ShaderByteCodeType backendShaderByteCodeType() final;
@@ -323,12 +323,12 @@ public:
       i32 num_passes, RasterPass *handles) final;
 
   void createRasterShaders(i32 num_shaders,
-                          const RasterShaderInit *shader_inits,
-                          RasterShader *handles_out) final;
+                           const RasterShaderInit *shader_inits,
+                           RasterShader *handles_out) final;
   void destroyRasterShaders(i32 num_shaders, RasterShader *handles) final;
 
   Swapchain createSwapchain(Surface surface,
-                            Span<const SwapchainFormat> format_prefrences,
+                            brt::Span<const SwapchainFormat> format_prefrences,
                             SwapchainProperties *properties) final;
   void destroySwapchain(Swapchain swapchain) final;
   AcquireSwapchainResult acquireSwapchainImage(Swapchain swapchain) final;

@@ -3,11 +3,10 @@
 #include "namespace.hpp"
 #include "gas.hpp"
 
-#include <madrona/span.hpp>
-
 namespace gas {
 
 enum class GPUAPISelect : u32 {
+  None,
   Vulkan,
   Metal,
   WebGPU,

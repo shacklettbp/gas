@@ -1,21 +1,23 @@
 #include "wgpu.hpp"
 #include "wgpu_init.hpp"
 
+#include <brt/macros.hpp>
 #include <dawn/native/DawnNative.h>
 
-#include <madrona/macros.hpp>
 
-#ifdef MADRONA_LINUX
+#ifdef BRT_OS_LINUX
 #include "linux.hpp"
 #endif
 
-#ifdef MADRONA_WINDOWS
+#ifdef BRT_OS_WINDOWS
 #include "windows.hpp"
 #endif
 
 //#define GAS_WGPU_DEBUG_PRINT (1)
 
 namespace gas::webgpu {
+
+using namespace brt;
 
 namespace {
 
@@ -37,7 +39,7 @@ inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
     case BGRA8_UNorm: return O::BGRA8Unorm;
     case BGRA8_SRGB: return O::BGRA8UnormSrgb;
     case Depth32_Float: return O::Depth32Float;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -100,7 +102,7 @@ inline wgpu::AddressMode convertSamplerAddressMode(SamplerAddressMode in)
     case Repeat: return O::Repeat;
     case MirrorRepeat: return O::MirrorRepeat;
     case InheritUMode: return O::Undefined;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -112,7 +114,7 @@ inline wgpu::FilterMode convertSamplerFilterMode(SamplerFilterMode in)
   switch (in) {
     case Nearest: return O::Nearest;
     case Linear:  return O::Linear;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -125,7 +127,7 @@ inline wgpu::MipmapFilterMode
   switch (in) {
     case Nearest: return O::Nearest;
     case Linear:  return O::Linear;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -173,7 +175,7 @@ inline wgpu::CompareFunction convertDepthCompare(DepthCompare in)
     case GreaterOrEqual: return O::GreaterEqual;
     case LessOrEqual: return O::LessEqual;
     case Disabled: return O::Always;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -186,7 +188,7 @@ inline wgpu::CullMode convertCullMode(CullMode in)
     case None: return O::None;
     case FrontFace: return O::Front;
     case BackFace: return O::Back;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -199,7 +201,7 @@ inline wgpu::LoadOp convertAttachmentLoadMode(AttachmentLoadMode in)
     case Load: return O::Load;
     case Clear: return O::Clear;
     case Undefined: return O::Undefined;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -212,7 +214,7 @@ inline wgpu::StoreOp convertAttachmentStoreMode(
   switch (in) {
     case Store: return O::Store;
     case Undefined: return O::Undefined;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -248,7 +250,7 @@ inline wgpu::BufferBindingType convertBufferBindingType(BufferBindingType in)
     case Uniform: case DynamicUniform: return O::Uniform;
     case Storage: return O::ReadOnlyStorage;
     case StorageRW: return O::Storage;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -261,7 +263,7 @@ inline wgpu::VertexFormat convertVertexFormat(VertexFormat in)
     case Vec2_F32: return O::Float32x2;
     case Vec3_F32: return O::Float32x3;
     case Vec4_UNorm8: return O::Unorm8x4;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -274,7 +276,7 @@ inline wgpu::BlendOperation convertBlendOp(BlendOperation in)
     case None: return O::Undefined;
     case Add: return O::Add;
     case Subtract: return O::Subtract;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -294,7 +296,7 @@ inline wgpu::BlendFactor convertBlendFactor(BlendFactor in)
     case OneMinusDst: return O::OneMinusDst;
     case DstAlpha: return O::DstAlpha;
     case OneMinusDstAlpha: return O::OneMinusDstAlpha;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
 }
 
@@ -379,7 +381,7 @@ void WebGPUAPI::shutdown()
 
 Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
 {
-#if defined(MADRONA_LINUX)
+#if defined(BRT_OS_LINUX)
   LinuxWindowHandle &linux_hdl = *(LinuxWindowHandle *)os_data;
 
   wgpu::SurfaceSourceXlibWindow from_xlib;
@@ -405,9 +407,9 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
         .label = nullptr,
       };
     } break;
-    default: MADRONA_UNREACHABLE();
+    default: BRT_UNREACHABLE();
   }
-#elif defined(MADRONA_MACOS)
+#elif defined(GAS_MACOS)
   wgpu::SurfaceSourceMetalLayer from_metal({
     .nextInChain = nullptr,
     .layer = os_data,
@@ -417,7 +419,7 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
     .nextInChain = &from_metal,
     .label = nullptr,
   };
-#elif defined(MADRONA_WINDOWS)
+#elif defined(BRT_OS_WINDOWS)
   Win32WindowHandle &win32_hdl = *(Win32WindowHandle *)os_data;
 
   wgpu::SurfaceSourceWindowsHWND from_windows_hwnd({
@@ -1243,7 +1245,7 @@ void Backend::createParamBlockTypes(
           sample_type = wgpu::TextureSampleType::UnfilterableFloat;
           tex_dim = wgpu::TextureViewDimension::e2D;
         } break;
-        default: MADRONA_UNREACHABLE();
+        default: BRT_UNREACHABLE();
       }
 
       layout_entries[out_binding_idx++] = wgpu::BindGroupLayoutEntry {
@@ -1281,7 +1283,7 @@ void Backend::createParamBlockTypes(
         case NonFiltering: {
           wgpu_sampler_binding_type = wgpu::SamplerBindingType::NonFiltering;
         } break;
-        default: MADRONA_UNREACHABLE();
+        default: BRT_UNREACHABLE();
       }
 
       layout_entries[out_binding_idx++] = wgpu::BindGroupLayoutEntry {
@@ -1770,7 +1772,7 @@ Swapchain Backend::createSwapchain(Surface surface,
             default: break;
           }
         } break;
-        default: MADRONA_UNREACHABLE();
+        default: BRT_UNREACHABLE();
       }
 
       if (valid) {
@@ -1994,14 +1996,14 @@ GPUTmpMemBlock Backend::allocGPUTmpStagingBlock(GPUQueue queue_hdl)
       };
     }
 
-    state.lock.lock();
+    spinLock(&state.lock);
 
     offset_range = staging_range_atomic.load<sync::relaxed>();
     global_offset = (u32)offset_range;
     range_end = u32(offset_range >> 32);
 
     if (global_offset < range_end) {
-      state.lock.unlock();
+      spinUnlock(&state.lock);
       continue;
     }
 
@@ -2017,7 +2019,7 @@ GPUTmpMemBlock Backend::allocGPUTmpStagingBlock(GPUQueue queue_hdl)
       (u64(global_offset + NUM_BLOCKS_PER_TMP_BUFFER) << 32) |
        u64(global_offset + 1));
 
-    state.lock.unlock();
+    spinUnlock(&state.lock);
 
     Buffer buffer_hdl {
       .gen = 1,
@@ -2064,14 +2066,14 @@ GPUTmpMemBlock Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl)
       };
     }
 
-    state.lock.lock();
+    spinLock(&state.lock);
 
     offset_range = tmp_input_range_atomic.load<sync::relaxed>();
     global_offset = (u32)offset_range;
     range_end = u32(offset_range >> 32);
 
     if (global_offset < range_end) {
-      state.lock.unlock();
+      spinUnlock(&state.lock);
       continue;
     }
 
@@ -2087,7 +2089,7 @@ GPUTmpMemBlock Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl)
       (u64(global_offset + NUM_BLOCKS_PER_TMP_BUFFER) << 32) |
        u64(global_offset + 1));
 
-    state.lock.unlock();
+    spinUnlock(&state.lock);
 
     Buffer buffer_hdl {
       .gen = 1,
@@ -2373,7 +2375,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           pass_enc.SetScissorRect(scissors.offsetX, scissors.offsetY,
                                   scissors.width, scissors.height);
         } break;
-        default: MADRONA_UNREACHABLE();
+        default: BRT_UNREACHABLE();
       }
     }
 
@@ -2495,7 +2497,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
           wgpu_enc.ClearBuffer(*buffers.hot(clear.buffer), clear.offset,
                                clear.numBytes);
         } break;
-        default: MADRONA_UNREACHABLE();
+        default: BRT_UNREACHABLE();
       }
     }
   };
@@ -2510,7 +2512,7 @@ void Backend::submit(GPUQueue queue_hdl, FrontendCommands *cmds)
       case CommandCtrl::CopyPass: {
         encodeCopyPass();
       } break;
-      default: MADRONA_UNREACHABLE();
+      default: BRT_UNREACHABLE();
     }
   }
 
@@ -2576,11 +2578,11 @@ wgpu::BindGroupLayout Backend::getBindGroupLayoutByParamBlockTypeID(
 
 i32 Backend::allocStagingBufferFromBelt()
 {
-  stagingBelt.lock.lock();
+  spinLock(&stagingBelt.lock);
+  BRT_DEFER(spinUnlock(&stagingBelt.lock));
 
   if (stagingBelt.numFree > 0) {
     i32 idx = stagingBelt.freeList[--stagingBelt.numFree];
-    stagingBelt.lock.unlock();
     return idx;
   }
 
@@ -2607,8 +2609,6 @@ i32 Backend::allocStagingBufferFromBelt()
     };
   }
 
-  stagingBelt.lock.unlock();
-
   return idx;
 }
 
@@ -2626,11 +2626,11 @@ void Backend::returnBufferToStagingBeltCallback(
 
   StagingBelt &belt = to_backend->stagingBelt;
 
-  belt.lock.lock();
+  spinLock(&belt.lock);
 
   belt.freeList[belt.numFree++] = buf_idx;
 
-  belt.lock.unlock();
+  spinUnlock(&belt.lock);
 }
 
 #if 0

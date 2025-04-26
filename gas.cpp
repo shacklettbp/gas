@@ -1,11 +1,11 @@
 #include "gas.hpp"
 #include "backend_common.hpp"
 
-#include <madrona/crash.hpp>
-#include <madrona/memory.hpp>
-#include <madrona/sync.hpp>
+#include <brt/sync.hpp>
 
 namespace gas {
+
+using namespace brt;
 
 ResourceUUIDMap::ResourceUUIDMap()
 {
@@ -23,7 +23,7 @@ i32 ResourceUUIDMap::lookup(UUID uuid)
 
   i32 result = NOT_FOUND;
 
-  MADRONA_UNROLL
+  BRT_UNROLL
   for (i32 i = 0; i < BUCKET_SIZE; i++) {
     u64 hash1 = bucket1->hashes[i];
     u64 hash2 = bucket2->hashes[i];
@@ -53,7 +53,7 @@ void ResourceUUIDMap::insert(UUID uuid, u16 row)
 
   bool duplicate = false;
 
-  MADRONA_UNROLL
+  BRT_UNROLL
   for (i32 i = 0; i < BUCKET_SIZE; i++) {
     u64 hash1 = bucket1->hashes[i];
     u64 hash2 = bucket2->hashes[i];
@@ -97,7 +97,7 @@ void ResourceUUIDMap::remove(UUID uuid)
   auto [key1, key2, bucket1, bucket2] = hash(uuid);
 
   i32 num_found = 0;
-  MADRONA_UNROLL
+  BRT_UNROLL
   for (i32 i = 0; i < BUCKET_SIZE; i++) {
     u64 hash1 = bucket1->hashes[i];
     u64 hash2 = bucket2->hashes[i];
@@ -144,7 +144,7 @@ ErrorStatus GPURuntime::currentErrorStatus()
 
 FrontendCommands * GPURuntime::allocCommandBlock()
 {
-  auto cmds = (FrontendCommands *)rawAlloc(sizeof(FrontendCommands));
+  auto cmds = (FrontendCommands *)malloc(sizeof(FrontendCommands));
   cmds->next = nullptr;
 
   return cmds;
@@ -154,7 +154,7 @@ void GPURuntime::deallocCommandBlocks(FrontendCommands *cmds)
 {
   while (cmds != nullptr) {
     FrontendCommands *next = cmds->next;
-    rawDealloc(cmds);
+    free(cmds);
     cmds = next;
   }
 }
