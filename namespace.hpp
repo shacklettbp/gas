@@ -1,17 +1,35 @@
 #pragma once
 
-#include <madrona/math.hpp>
+#include <cstdint>
+#include <cstdlib>
 
 namespace gas {
 
-using namespace madrona;
+using u32 = uint32_t;
+using i32 = int32_t;
+using u64 = uint64_t;
+using i64 = int64_t;
+using u16 = uint16_t;
+using i16 = int16_t;
 
-using math::Vector2;
-using math::Vector3;
-using math::Vector4;
-using math::Quat;
-using math::Diag3x3;
-using math::AABB;
-using math::AABB2D;
+inline constexpr u32 operator "" _u32(unsigned long long v) 
+{ 
+    return uint32_t(v);
+}
+
+inline constexpr u64 operator "" _u64(unsigned long long v) 
+{ 
+    return uint64_t(v);
+}
+
+inline constexpr i32 operator "" _i32(unsigned long long v) 
+{ 
+    return int32_t(v);
+}
+
+inline constexpr i64 operator "" _i64(unsigned long long v) 
+{ 
+    return int64_t(v);
+}
 
 }

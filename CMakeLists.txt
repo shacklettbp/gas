@@ -4,30 +4,18 @@ if (NOT PROJECT_NAME)
   cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
   cmake_policy(VERSION 3.26)
   
-  set(GAS_MADRONA_DIR "" CACHE STRING "Directory containing madrona")
-  
-  if (NOT GAS_MADRONA_DIR)
-    message(FATAL_ERROR "Must set GAS_MADRONA_DIR")
-  endif()
-  
-  include("${GAS_MADRONA_DIR}/cmake/madrona_init.cmake")
-
   list(APPEND LANGS C CXX)
   if (APPLE)
     list(APPEND LANGS OBJC)
   endif()
 
   project(gas LANGUAGES ${LANGS})
-  
-  include(setup)
-  include(dependencies)
-  
-  SET(MADRONA_ENABLE_TESTS TRUE)
-  add_subdirectory("${GAS_MADRONA_DIR}" madrona-standalone EXCLUDE_FROM_ALL)
 endif()
 
 add_subdirectory(deps)
 
+include(sys-detect)
+include(cxx-setup)
 include(gas-find-deps)
 
 list(APPEND GAS_CORE_SOURCES
@@ -48,10 +36,6 @@ add_library(gas_core STATIC
   ${GAS_CORE_SOURCES}
 )
 
-target_link_libraries(gas_core PRIVATE
-  madrona_common
-)
-
 if (GAS_USE_DAWN)
   target_link_libraries(gas_core PRIVATE gas_dawn)
 endif()
@@ -61,7 +45,7 @@ add_library(gas_ui STATIC
 )
 
 target_link_libraries(gas_ui PRIVATE
-  gas_core madrona_common
+  gas_core
 )
 
 if (GAS_USE_SDL)
@@ -80,7 +64,7 @@ target_link_libraries(gas_imgui
   PUBLIC
     gas_imgui_hdrs
   PRIVATE
-    gas_core gas_ui gas_imgui_impl madrona_common
+    gas_core gas_ui gas_imgui_impl
 )
 
 add_library(gas_shader_compiler SHARED
@@ -88,14 +72,9 @@ add_library(gas_shader_compiler SHARED
 )
 target_link_libraries(gas_shader_compiler PRIVATE
   gas_slang
-  madrona_common
 )
 
 function(gas_link_hermetic_libcxx tgt)
-  if (WIN32)
-    return()
-  endif()
-
   FetchContent_GetProperties(MadronaBundledToolchain)
 
   set(HERMETIC_LIBCXX_PATH "${madronabundledtoolchain_SOURCE_DIR}/libcxx-hermetic")
@@ -115,8 +94,6 @@ if (GAS_USE_DAWN)
     wgpu_shader_compiler.cpp
   )
   target_link_libraries(gas_dawn_tint PRIVATE 
-    madrona_hdrs
-    madrona_noexceptrtti
     gas_dawn
     gas_dawn_tint_libs
   )
@@ -124,7 +101,7 @@ if (GAS_USE_DAWN)
   if (WIN32)
     set_property(TARGET gas_dawn_tint PROPERTY
       MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
-  else()
+  elseif(NOT EMPSCRIPTEN)
     gas_link_hermetic_libcxx(gas_dawn_tint)
   endif()
 
