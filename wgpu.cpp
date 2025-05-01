@@ -2,7 +2,10 @@
 #include "wgpu_init.hpp"
 
 #include <brt/macros.hpp>
+
+#ifndef EMSCRIPTEN
 #include <dawn/native/DawnNative.h>
+#endif
 
 
 #ifdef BRT_OS_LINUX
@@ -26,6 +29,53 @@ struct InitDeviceResult {
   wgpu::Device device;
   BackendLimits limits;
 };
+
+#ifndef EMSCRIPTEN
+void instanceLoggingCB(wgpu::LoggingType type,
+                       wgpu::StringView message,
+                       void *user_data)
+{
+  (void)type;
+  (void)user_data;
+  fprintf(stderr, " Instance Logging: %s\n", message.data);
+}
+
+void deviceLoggingCB(wgpu::LoggingType type,
+                     wgpu::StringView message,
+                     void *user_data)
+{
+  (void)type;
+  (void)user_data;
+  fprintf(stderr, " Device Logging: %s\n", message.data);
+}
+#endif
+
+void deviceLostCB(const wgpu::Device &wgpu_dev,
+                  wgpu::DeviceLostReason lost_reason,
+                  wgpu::StringView message,
+                  WGPUDevice *destroying_device)
+{
+  (void)lost_reason;
+
+  if (wgpu_dev.Get() == *destroying_device) {
+    return;
+  }
+
+  FATAL(" device lost: %s", message.data);
+}
+
+void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
+                       wgpu::ErrorType error_type,
+                       wgpu::StringView message,
+                       void *user_data)
+{
+  (void)wgpu_dev;
+  (void)error_type;
+  (void)user_data;
+
+  fprintf(stderr, " uncaptured error: %s\n", message.data);
+  debuggerBreakPoint();
+}
 
 inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
 {
@@ -300,51 +350,6 @@ inline wgpu::BlendFactor convertBlendFactor(BlendFactor in)
   }
 }
 
-void instanceLoggingCB(wgpu::LoggingType type,
-                       wgpu::StringView message,
-                       void *user_data)
-{
-  (void)type;
-  (void)user_data;
-  fprintf(stderr, " Instance Logging: %s\n", message.data);
-}
-
-void deviceLoggingCB(wgpu::LoggingType type,
-                     wgpu::StringView message,
-                     void *user_data)
-{
-  (void)type;
-  (void)user_data;
-  fprintf(stderr, " Device Logging: %s\n", message.data);
-}
-
-void deviceLostCB(const wgpu::Device &wgpu_dev,
-                  wgpu::DeviceLostReason lost_reason,
-                  wgpu::StringView message,
-                  WGPUDevice *destroying_device)
-{
-  (void)lost_reason;
-
-  if (wgpu_dev.Get() == *destroying_device) {
-    return;
-  }
-
-  FATAL(" device lost: %s", message.data);
-}
-
-void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
-                       wgpu::ErrorType error_type,
-                       wgpu::StringView message,
-                       void *user_data)
-{
-  (void)wgpu_dev;
-  (void)error_type;
-  (void)user_data;
-
-  fprintf(stderr, " uncaptured error: %s\n", message.data);
-  debuggerBreakPoint();
-}
-
 }
 
 GPULib * WebGPULib::init(const APIConfig &cfg)
@@ -355,6 +360,7 @@ GPULib * WebGPULib::init(const APIConfig &cfg)
     },
   };
 
+#ifndef EMSCRIPTEN
   dawn::native::DawnInstanceDescriptor dawn_inst_desc;
   if (cfg.enableValidation) {
     dawn_inst_desc.nextInChain = inst_desc.nextInChain;
@@ -364,6 +370,7 @@ GPULib * WebGPULib::init(const APIConfig &cfg)
       dawn::native::BackendValidationLevel::Full;
     dawn_inst_desc.SetLoggingCallback(instanceLoggingCB, (void *)nullptr);
   }
+#endif
 
   wgpu::Instance instance = wgpu::CreateInstance(&inst_desc);
   auto *api = new WebGPULib();
@@ -430,6 +437,16 @@ Surface WebGPULib::createSurface(void *os_data, i32 width, i32 height)
   
   wgpu::SurfaceDescriptor surface_desc {
     .nextInChain = &from_windows_hwnd,
+    .label = nullptr,
+  };
+#elif defined(EMSCRIPTEN)
+  const char *selector = (const char *)os_data;
+
+  wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas_desc {};
+  canvas_desc.selector = selector;
+
+  wgpu::SurfaceDescriptor surface_desc {
+    .nextInChain = &canvas_desc,
     .label = nullptr,
   };
 #else
@@ -517,6 +534,7 @@ static InitDeviceResult initDevice(
     wgpu::DeviceDescriptor dev_desc;
     dev_desc.requiredLimits = &required_limits;
 
+#ifndef EMSCRIPTEN
     wgpu::DawnTogglesDescriptor dev_toggles_desc;
     auto toggles = std::to_array({"dump_shaders"});
     dev_toggles_desc.enabledToggleCount = 1;
@@ -525,6 +543,7 @@ static InitDeviceResult initDevice(
     if (api->debugPipelineCompilation) {
       dev_desc.nextInChain = &dev_toggles_desc;
     }
+#endif
 
     dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
                                    deviceLostCB, &api->destroyingDevice);
@@ -549,7 +568,9 @@ static InitDeviceResult initDevice(
     }
   }
 
+#ifndef EMSCRIPTEN
   device.SetLoggingCallback(deviceLoggingCB, (void *)nullptr);
+#endif
 
   BackendLimits out_limits {
     .maxNumUniformBytes =
@@ -979,7 +1000,7 @@ void Backend::prepareStagingBuffers(i32 num_buffers,
     auto map_cb = [](wgpu::MapAsyncStatus, char const *, void *) {};
 
     wgpu::Future map_future = to_buffer->MapAsync(
-        wgpu::MapMode::Write, 0, WGPU_WHOLE_SIZE,
+        wgpu::MapMode::Write, 0, WGPU_WHOLE_MAP_SIZE,
         wgpu::CallbackMode::WaitAnyOnly, map_cb, (void *)nullptr);
 
     wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
@@ -1048,7 +1069,7 @@ void * Backend::beginReadback(Buffer buffer)
   };
 
   wgpu::Future map_future = to_buffer->MapAsync(
-      wgpu::MapMode::Read, 0, WGPU_WHOLE_SIZE,
+      wgpu::MapMode::Read, 0, WGPU_WHOLE_MAP_SIZE,
       wgpu::CallbackMode::WaitAnyOnly, map_cb, &map_status);
 
   wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
@@ -1383,7 +1404,7 @@ wgpu::BindGroup Backend::createBindGroup(ParamBlockInit init)
       .buffer = *to_buf,
       .offset = (u64)binding.offset,
       .size = binding.numBytes == 0xFFFF'FFFF ?
-        WGPU_WHOLE_SIZE : (u64)binding.numBytes,
+        WGPU_WHOLE_MAP_SIZE : (u64)binding.numBytes,
     };
 
     entry_idx += 1;

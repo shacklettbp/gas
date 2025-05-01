@@ -1,15 +1,27 @@
-set(DAWN_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dawn-src")
-set(DAWN_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-dawn")
-set(DAWN_BUILD_TYPE "Release")
+# Git hash is used for the native build, build version is used for emscripten.
+# These should be kept in sync
+set(DAWN_GIT_HASH a75fd5d9e264de7120a55d983b3dd0cfc6225619)
+set(EMDAWN_VERSION v20250430.214924)
+set(EMDAWN_HASH 8505f323a0174c85c23a7ad593830840bc4e42e1185aafcc581e0aad0fc51f38)
 
-set(DAWN_BUILD_DIR "${GAS_BUNDLE_TMP_DIR}/dawn-build")
-set(DAWN_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-stamp")
-set(DAWN_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-config-hash")
+if (EMSCRIPTEN)
+  set(DAWN_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-emdawn")
+  set(DAWN_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/emdawn-build-stamp")
+  set(DAWN_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/emdawn-build-config-hash")
+else ()
+  set(DAWN_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dawn-src")
+  set(DAWN_BUILD_TYPE "Release")
+
+  set(DAWN_BUNDLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bundled-dawn")
+  set(DAWN_BUILD_DIR "${GAS_BUNDLE_TMP_DIR}/dawn-build")
+  set(DAWN_BUILD_TIMESTAMP_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-stamp")
+  set(DAWN_BUILD_CONFIG_HASH_FILE "${GAS_BUNDLE_TMP_DIR}/dawn-build-config-hash")
+endif()
 
 function(fetch_build_dawn)
   FetchContent_Populate(dawn-bundled
     GIT_REPOSITORY https://dawn.googlesource.com/dawn
-    GIT_TAG c31a83a83919563f1fa4eab258724d5c746207b5
+    GIT_TAG ${DAWN_GIT_HASH}
     GIT_PROGRESS ON
     GIT_SUBMODULES ""
     GIT_SUBMODULES_RECURSE OFF
@@ -170,6 +182,18 @@ index 61f4f4d2d4..43b18c1eef 100644
   build_dawn()
 endfunction()
 
+function(fetch_emdawn)
+  FetchContent_Populate(dawn-bundled
+    URL https://github.com/google/dawn/releases/download/${EMDAWN_VERSION}/emdawnwebgpu_pkg-${EMDAWN_VERSION}.zip
+    URL_HASH SHA256=${EMDAWN_HASH}
+    SOURCE_DIR "${DAWN_BUNDLED_DIR}"
+  )
+
+  file(SHA512 "${CMAKE_CURRENT_LIST_FILE}" DAWN_CONFIG_FILE_HASH)
+  file(TOUCH "${DAWN_BUILD_TIMESTAMP_FILE}")
+  file(WRITE "${DAWN_BUILD_CONFIG_HASH_FILE}" "${DAWN_CONFIG_FILE_HASH}")
+endfunction()
+
 function(check_build_dawn)
   file(SHA512 "${CMAKE_CURRENT_LIST_FILE}" DAWN_CONFIG_FILE_HASH)
 
@@ -199,7 +223,11 @@ function(check_build_dawn)
   endif()
 
   if (NEED_BUILD_DAWN)
-    fetch_build_dawn()
+    if (EMSCRIPTEN)
+      fetch_emdawn()
+    else ()
+      fetch_build_dawn()
+    endif()
   endif()
 endfunction()
 

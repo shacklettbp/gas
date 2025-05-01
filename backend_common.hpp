@@ -304,10 +304,10 @@ public:
       i32 new_capacity = capacity_ * 2;
       auto new_data = (Elem *)malloc(sizeof(Elem) * new_capacity);
       if (capacity_ > NUM_INLINE) {
-        memcpy(new_data, data_, sizeof(Elem) * capacity_);
+        memcpy((void *)new_data, data_, sizeof(Elem) * capacity_);
         free(data_);
       } else {
-        memcpy(new_data, inline_data_, sizeof(Elem) * capacity_);
+        memcpy((void *)new_data, inline_data_, sizeof(Elem) * capacity_);
       }
 
       data_ = new_data;

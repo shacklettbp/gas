@@ -1,7 +1,3 @@
-if (EMSCRIPTEN)
-  return()
-endif()
-
 get_property(MULTI_CFG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (MULTI_CFG)
     set(DEP_LIB_OUT_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/$<CONFIG>")
@@ -166,10 +162,22 @@ function(find_dawn)
   endif()
 endfunction()
 
+function(find_emdawn)
+  add_library(gas_dawn INTERFACE)
+  target_compile_options(gas_dawn INTERFACE
+    --use-port=${DAWN_BUNDLED_DIR}/emdawnwebgpu.port.py
+  )
+endfunction()
+
 if (GAS_USE_DAWN)
-  find_dawn()
+  if (EMSCRIPTEN)
+    find_emdawn()
+  else()
+    find_dawn()
+  endif()
 endif()
 unset(find_dawn)
+unset(find_emdawn)
 
 function(find_slang)
   if (WIN32)
@@ -247,7 +255,9 @@ function(find_slang)
   )
 endfunction()
 
-find_slang()
+if (NOT EMSCRIPTEN)
+  find_slang()
+endif()
 unset(find_slang)
 
 function(find_imgui)

@@ -6,5 +6,6 @@
 /deps/sdl-src
 /deps/dawn-src
 /deps/bundled-dawn
+/deps/bundled-emdawn
 /deps/bundled-slang
 /deps/imgui

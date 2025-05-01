@@ -3,10 +3,9 @@ set(FETCHCONTENT_BASE_DIR "${GAS_BUNDLE_TMP_DIR}")
 set(FETCHCONTENT_QUIET FALSE)
 
 set(GAS_USE_SDL FALSE)
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if (BRT_OS_LINUX OR BRT_OS_WINDOWS OR BRT_OS_MACOS)
   set(GAS_USE_SDL TRUE)
 endif()
-set(GAS_USE_SDL TRUE) # FIXME
 
 set(GAS_USE_SDL "${GAS_USE_SDL}" PARENT_SCOPE)
 
@@ -15,22 +14,17 @@ if (GAS_USE_SDL)
   set(SDL_BUNDLED_DIR "${SDL_BUNDLED_DIR}" PARENT_SCOPE)
 endif()
 
-if (EMSCRIPTEN)
-  set(GAS_USE_DAWN_DEFAULT OFF)
-else ()
-  set(GAS_USE_DAWN_DEFAULT ON)
-endif()
-
-option(GAS_USE_DAWN "GAS use Dawn for native WebGPU support" ${GAS_USE_DAWN_DEFAULT})
-unset(GAS_USE_DAWN_DEFAULT)
+option(GAS_USE_DAWN "GAS use Dawn for C++ WebGPU support" TRUE)
 
 if (GAS_USE_DAWN)
   include(setup-dawn.cmake)
   set(DAWN_BUNDLED_DIR "${DAWN_BUNDLED_DIR}" PARENT_SCOPE)
 endif()
 
-include(setup-slang.cmake)
-set(SLANG_BUNDLED_DIR "${SLANG_BUNDLED_DIR}" PARENT_SCOPE)
+if (NOT EMSCRIPTEN)
+  include(setup-slang.cmake)
+  set(SLANG_BUNDLED_DIR "${SLANG_BUNDLED_DIR}" PARENT_SCOPE)
+endif()
 
 include(setup-imgui.cmake)
 set(IMGUI_BUNDLED_DIR "${IMGUI_BUNDLED_DIR}" PARENT_SCOPE)
