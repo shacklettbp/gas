@@ -6,9 +6,8 @@ class RasterPassEncoder;
 class ComputePassEncoder;
 class CopyPassEncoder;
 class CommandEncoder;
-class GPURuntime;
+class GPUDevice;
 class ShaderCompiler;
-class GPURuntime;
 class GPULib;
 class GPUAPI;
 

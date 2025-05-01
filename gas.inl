@@ -90,7 +90,7 @@ inline BlendingConfig BlendingConfig::additiveDefault()
   };
 }
 
-u32 * CommandWriter::reserve(GPURuntime *gpu)
+u32 * CommandWriter::reserve(GPUDevice *gpu)
 {
   if ((size_t)offset_ == cmds_->data.size()) [[unlikely]] {
     if (cmds_->next == nullptr) [[unlikely]] {
@@ -105,18 +105,18 @@ u32 * CommandWriter::reserve(GPURuntime *gpu)
   return &cmds_->data[offset_++];
 }
 
-void CommandWriter::writeU32(GPURuntime *gpu, uint32_t v)
+void CommandWriter::writeU32(GPUDevice *gpu, uint32_t v)
 {
   *reserve(gpu) = v;
 }
 
 template <typename T>
-void CommandWriter::id(GPURuntime *gpu, T t)
+void CommandWriter::id(GPUDevice *gpu, T t)
 {
   writeU32(gpu, t.uint());
 }
 
-void CommandWriter::ctrl(GPURuntime *gpu, CommandCtrl ctrl)
+void CommandWriter::ctrl(GPUDevice *gpu, CommandCtrl ctrl)
 {
   writeU32(gpu, (u32)ctrl);
 }
@@ -395,7 +395,7 @@ void RasterPassEncoder::encodeDraw(
   ctrl_ = None;
 }
 
-RasterPassEncoder::RasterPassEncoder(GPURuntime *gpu,
+RasterPassEncoder::RasterPassEncoder(GPUDevice *gpu,
                                      CommandWriter writer,
                                      GPUQueue queue,
                                      GPUTmpMemBlock gpu_input)
@@ -594,7 +594,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
   };
 }
 
-CopyPassEncoder::CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
+CopyPassEncoder::CopyPassEncoder(GPUDevice *gpu, CommandWriter writer,
                                  GPUQueue queue, GPUTmpMemBlock tmp_staging)
   : gpu_(gpu),
     writer_(writer),
@@ -657,7 +657,7 @@ void CommandEncoder::endCopyPass(CopyPassEncoder &copy_enc)
   tmp_staging_ = copy_enc.tmp_staging_;
 }
 
-Buffer GPURuntime::createBuffer(BufferInit init,
+Buffer GPUDevice::createBuffer(BufferInit init,
                                 GPUQueue tx_queue)
 {
   Buffer out {};
@@ -665,12 +665,12 @@ Buffer GPURuntime::createBuffer(BufferInit init,
   return out;
 }
 
-void GPURuntime::destroyBuffer(Buffer buffer)
+void GPUDevice::destroyBuffer(Buffer buffer)
 {
   destroyBuffers(1, &buffer);
 }
 
-Texture GPURuntime::createTexture(TextureInit init,
+Texture GPUDevice::createTexture(TextureInit init,
                                   GPUQueue tx_queue)
 {
   Texture out {};
@@ -678,12 +678,12 @@ Texture GPURuntime::createTexture(TextureInit init,
   return out;
 }
 
-void GPURuntime::destroyTexture(Texture texture)
+void GPUDevice::destroyTexture(Texture texture)
 {
   destroyTextures(1, &texture);
 }
 
-void GPURuntime::createBuffers(i32 num_buffers,
+void GPUDevice::createBuffers(i32 num_buffers,
                                const BufferInit *buffer_inits,
                                Buffer *handles_out,
                                GPUQueue tx_queue)
@@ -692,12 +692,12 @@ void GPURuntime::createBuffers(i32 num_buffers,
                      0, nullptr, nullptr, tx_queue);
 }
 
-void GPURuntime::destroyBuffers(i32 num_buffers, Buffer *buffers)
+void GPUDevice::destroyBuffers(i32 num_buffers, Buffer *buffers)
 {
   destroyGPUResources(num_buffers, buffers, 0, nullptr);
 }
 
-void GPURuntime::createTextures(i32 num_textures,
+void GPUDevice::createTextures(i32 num_textures,
                                 const TextureInit *texture_inits,
                                 Texture *handles_out,
                                 GPUQueue tx_queue)
@@ -706,12 +706,12 @@ void GPURuntime::createTextures(i32 num_textures,
                      num_textures, texture_inits, handles_out, tx_queue);
 }
 
-void GPURuntime::destroyTextures(i32 num_textures, Texture *textures)
+void GPUDevice::destroyTextures(i32 num_textures, Texture *textures)
 {
   destroyGPUResources(0, nullptr, num_textures, textures);
 }
 
-void GPURuntime::createGPUResources(GPUResourcesCreate create,
+void GPUDevice::createGPUResources(GPUResourcesCreate create,
                                     GPUQueue tx_queue)
 {
   chk(create.buffers.size() == create.buffersOut.size());
@@ -726,7 +726,7 @@ void GPURuntime::createGPUResources(GPUResourcesCreate create,
                      tx_queue);
 }
 
-void GPURuntime::destroyGPUResources(GPUResourcesDestroy destroy)
+void GPUDevice::destroyGPUResources(GPUResourcesDestroy destroy)
 {
   destroyGPUResources((i32)destroy.buffers.size(),
                       destroy.buffers.data(),
@@ -734,19 +734,19 @@ void GPURuntime::destroyGPUResources(GPUResourcesDestroy destroy)
                       destroy.textures.data());
 }
 
-Sampler GPURuntime::createSampler(SamplerInit init)
+Sampler GPUDevice::createSampler(SamplerInit init)
 {
   Sampler out {};
   createSamplers(1, &init, &out);
   return out;
 }
 
-void GPURuntime::destroySampler(Sampler sampler)
+void GPUDevice::destroySampler(Sampler sampler)
 {
   destroySamplers(1, &sampler);
 }
 
-ParamBlockType GPURuntime::createParamBlockType(
+ParamBlockType GPUDevice::createParamBlockType(
     ParamBlockTypeInit init)
 {
   ParamBlockType blk_type {};
@@ -754,24 +754,24 @@ ParamBlockType GPURuntime::createParamBlockType(
   return blk_type;
 }
 
-void GPURuntime::destroyParamBlockType(ParamBlockType blk_type)
+void GPUDevice::destroyParamBlockType(ParamBlockType blk_type)
 {
   destroyParamBlockTypes(1, &blk_type);
 }
 
-ParamBlock GPURuntime::createParamBlock(ParamBlockInit init)
+ParamBlock GPUDevice::createParamBlock(ParamBlockInit init)
 {
   ParamBlock group {};
   createParamBlocks(1, &init, &group);
   return group;
 }
 
-void GPURuntime::destroyParamBlock(ParamBlock group)
+void GPUDevice::destroyParamBlock(ParamBlock group)
 {
   destroyParamBlocks(1, &group);
 }
 
-RasterPassInterface GPURuntime::createRasterPassInterface(
+RasterPassInterface GPUDevice::createRasterPassInterface(
     RasterPassInterfaceInit init)
 {
   RasterPassInterface interface {};
@@ -779,36 +779,36 @@ RasterPassInterface GPURuntime::createRasterPassInterface(
   return interface;
 }
 
-void GPURuntime::destroyRasterPassInterface(RasterPassInterface interface)
+void GPUDevice::destroyRasterPassInterface(RasterPassInterface interface)
 {
   destroyRasterPassInterfaces(1, &interface);
 }
 
-RasterPass GPURuntime::createRasterPass(RasterPassInit init)
+RasterPass GPUDevice::createRasterPass(RasterPassInit init)
 {
   RasterPass pass {};
   createRasterPasses(1, &init, &pass);
   return pass;
 }
 
-void GPURuntime::destroyRasterPass(RasterPass pass)
+void GPUDevice::destroyRasterPass(RasterPass pass)
 {
   destroyRasterPasses(1, &pass);
 }
 
-RasterShader GPURuntime::createRasterShader(RasterShaderInit init)
+RasterShader GPUDevice::createRasterShader(RasterShaderInit init)
 {
   RasterShader out {};
   createRasterShaders(1, &init, &out);
   return out;
 }
 
-void GPURuntime::destroyRasterShader(RasterShader shader)
+void GPUDevice::destroyRasterShader(RasterShader shader)
 {
   destroyRasterShaders(1, &shader);
 }
 
-CommandEncoder::CommandEncoder(GPURuntime *gpu,
+CommandEncoder::CommandEncoder(GPUDevice *gpu,
                                GPUQueue queue)
   : gpu_(gpu),
     cmds_head_(gpu->allocCommandBlock()),
@@ -823,27 +823,27 @@ ComputePassEncoder::ComputePassEncoder() = default;
 CopyPassEncoder::CopyPassEncoder() = default;
 CommandEncoder::CommandEncoder() = default;
 
-GPUQueue GPURuntime::getMainQueue()
+GPUQueue GPUDevice::getMainQueue()
 {
   return GPUQueue { 0 };
 }
 
-GPUQueue GPURuntime::getUploadQueue()
+GPUQueue GPUDevice::getUploadQueue()
 {
   return GPUQueue { 1 };
 }
 
-CommandEncoder GPURuntime::createCommandEncoder(GPUQueue queue)
+CommandEncoder GPUDevice::createCommandEncoder(GPUQueue queue)
 {
   return CommandEncoder(this, queue);
 }
 
-void GPURuntime::destroyCommandEncoder(CommandEncoder &encoder)
+void GPUDevice::destroyCommandEncoder(CommandEncoder &encoder)
 {
   deallocCommandBlocks(encoder.cmds_head_);
 }
 
-void GPURuntime::submit(GPUQueue queue, CommandEncoder &enc)
+void GPUDevice::submit(GPUQueue queue, CommandEncoder &enc)
 {
   submit(queue, enc.cmds_head_);
 }

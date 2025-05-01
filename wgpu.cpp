@@ -347,7 +347,7 @@ void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
 
 }
 
-GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
+GPULib * WebGPULib::init(const APIConfig &cfg)
 {
   wgpu::InstanceDescriptor inst_desc {
     .capabilities = {
@@ -366,20 +366,20 @@ GPUAPI * WebGPUAPI::init(const APIConfig &cfg)
   }
 
   wgpu::Instance instance = wgpu::CreateInstance(&inst_desc);
-  auto *api = new WebGPUAPI();
+  auto *api = new WebGPULib();
   api->inst = std::move(instance);
   api->destroyingDevice = nullptr;
   api->debugPipelineCompilation = cfg.debugPipelineCompilation;
-  api->errorsAreFatal = cfg.runtimeErrorsAreFatal;
+  api->errorsAreFatal = cfg.errorsAreFatal;
   return api;
 }
 
-void WebGPUAPI::shutdown()
+void WebGPULib::shutdown()
 {
   delete this;
 }
 
-Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
+Surface WebGPULib::createSurface(void *os_data, i32 width, i32 height)
 {
 #if defined(BRT_OS_LINUX)
   LinuxWindowHandle &linux_hdl = *(LinuxWindowHandle *)os_data;
@@ -409,7 +409,7 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
     } break;
     default: BRT_UNREACHABLE();
   }
-#elif defined(GAS_MACOS)
+#elif defined(BRT_OS_MACOS)
   wgpu::SurfaceSourceMetalLayer from_metal({
     .nextInChain = nullptr,
     .layer = os_data,
@@ -446,7 +446,7 @@ Surface WebGPUAPI::createSurface(void *os_data, i32 width, i32 height)
   };
 }
 
-void WebGPUAPI::destroySurface(Surface surface)
+void WebGPULib::destroySurface(Surface surface)
 {
   wgpuSurfaceRelease((WGPUSurface)surface.hdl.ptr);
 } 
@@ -463,7 +463,7 @@ static wgpu::WaitStatus busyWaitForFuture(
 }
 
 static InitDeviceResult initDevice(
-  WebGPUAPI *api, i32 idx, Span<const Surface> surfaces)
+  WebGPULib *api, i32 idx, Span<const Surface> surfaces)
 {
   // Cannot select specific GPU in webgpu
   assert(idx == 0);
@@ -559,7 +559,7 @@ static InitDeviceResult initDevice(
   return { std::move(adapter), std::move(device), out_limits };
 }
 
-GPURuntime * WebGPUAPI::createRuntime(
+GPUDevice * WebGPULib::createDevice(
     i32 gpu_idx, Span<const Surface> surfaces)
 {
   auto [adapter, device, limits] = initDevice(this, gpu_idx, surfaces);
@@ -570,13 +570,13 @@ GPURuntime * WebGPUAPI::createRuntime(
                      inst, limits, errorsAreFatal);
 }
 
-void WebGPUAPI::destroyRuntime(GPURuntime *runtime)
+void WebGPULib::destroyDevice(GPUDevice *gpu)
 {
-  auto wgpu_backend = static_cast<Backend *>(runtime);
+  auto wgpu_backend = static_cast<Backend *>(gpu);
   wgpu_backend->destroy();
 
   // Hacky, the device lost callback has a pointer
-  // to the destroyingDevice member in the WebGPUAPI class,
+  // to the destroyingDevice member in the WebGPULib class,
   // which it checks to see if we're manually destroying this device.
   destroyingDevice = wgpu_backend->dev.Get();
 
@@ -585,7 +585,7 @@ void WebGPUAPI::destroyRuntime(GPURuntime *runtime)
   destroyingDevice = nullptr;
 }
 
-ShaderByteCodeType WebGPUAPI::backendShaderByteCodeType()
+ShaderByteCodeType WebGPULib::backendShaderByteCodeType()
 {
   return ShaderByteCodeType::WGSL;
 }
@@ -2746,16 +2746,9 @@ void Backend::allocGPUTmpBuffer(GPUTmpInputState &state, i32 buf_idx)
   state.maxNumUsedTmpGPUBuffers += 1;
 }
 
-GPULib * loadWebGPULib()
+GPULib * initWebGPU(const APIConfig &cfg)
 {
-  return nullptr;
-}
-
-GPUAPI * initWebGPU(GPULib *lib, const APIConfig &cfg)
-{
-  (void)lib;
-
-  return WebGPUAPI::init(cfg);
+  return WebGPULib::init(cfg);
 }
 
 }

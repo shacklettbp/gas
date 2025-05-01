@@ -754,7 +754,7 @@ private:
   CopyCommand copy_cmd_;
 };
 
-class BackendCommon : public GPURuntime {
+class BackendCommon : public GPUDevice {
 public:
   BackendCommon(bool errors_are_fatal);
 

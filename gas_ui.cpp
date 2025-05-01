@@ -21,8 +21,6 @@
 
 #endif
 
-#include "init.hpp"
-
 #ifdef GAS_SUPPORT_WEBGPU
 #include "wgpu_init.hpp"
 #endif
@@ -52,7 +50,6 @@ struct PlatformWindow : public Window {
 
 struct UIBackend : public UISystem {
   GPULib *gpuLib;
-  GPUAPI *gpuAPI;
 
   PlatformWindow mainWindow;
 #ifdef GAS_USE_SDL
@@ -141,28 +138,24 @@ UISystem * UISystem::init(const Config &cfg)
   initUIBackendAPI();
 
   GPUAPISelect api_select;
-  if (cfg.desiredGPUAPI == GPUAPISelect::None) {
-    api_select = InitSystem::autoSelectAPI();
+  if (cfg.desiredGPULib == GPUAPISelect::None) {
+    api_select = GPULib::autoSelectAPI();
   } else {
-    api_select = cfg.desiredGPUAPI;
+    api_select = cfg.desiredGPULib;
   }
-
-  // FIXME:
-  GPULib *gpu_lib = nullptr;
 
   std::vector<const char *> api_exts;
 
-  GPUAPI *gpu_api = InitSystem::initAPI(api_select, gpu_lib, {
+  GPULib *gpu_lib = GPULib::init(api_select, {
     .enableValidation = cfg.enableValidation,
     .debugPipelineCompilation = cfg.debugPipelineCompilation,
-    .runtimeErrorsAreFatal = cfg.runtimeErrorsAreFatal,
+    .errorsAreFatal = cfg.errorsAreFatal,
     .enablePresent = true,
     .apiExtensions = api_exts,
   });
 
   return new UIBackend {
     .gpuLib = gpu_lib,
-    .gpuAPI = gpu_api,
     .mainWindow = {},
 #ifdef GAS_USE_SDL
     .mainWindowID = {},
@@ -175,8 +168,7 @@ UISystem * UISystem::init(const Config &cfg)
 
 void UIBackend::shutdown()
 {
-  gpuAPI->shutdown();
-  InitSystem::unloadAPILib(gpuLib);
+  gpuLib->shutdown();
 
   delete this;
 
@@ -184,7 +176,7 @@ void UIBackend::shutdown()
 }
 
 static void initWindow(PlatformWindow *window_out,
-                       GPUAPI *gpu_api,
+                       GPULib *gpu_api,
                        const char *title,
                        i32 starting_pixel_width,
                        i32 starting_pixel_height,
@@ -309,7 +301,7 @@ static void initWindow(PlatformWindow *window_out,
 }
 
 static void cleanupWindow(PlatformWindow *window,
-                          GPUAPI *gpu_api)
+                          GPULib *gpu_api)
 {
   gpu_api->destroySurface(window->surface);
 
@@ -330,7 +322,7 @@ Window * UIBackend::createWindow(const char *title,
 {
   PlatformWindow *window = new PlatformWindow {};
 
-  initWindow(window, gpuAPI, title,
+  initWindow(window, gpuLib, title,
              starting_pixel_width, starting_pixel_height, flags);
 
   return window;
@@ -341,7 +333,7 @@ Window * UIBackend::createMainWindow(const char *title,
                                     i32 starting_pixel_height,
                                     WindowInitFlags flags)
 {
-  initWindow(&mainWindow, gpuAPI, title,
+  initWindow(&mainWindow, gpuLib, title,
              starting_pixel_width, starting_pixel_height, flags);
 
 #ifdef GAS_USE_SDL
@@ -354,13 +346,13 @@ Window * UIBackend::createMainWindow(const char *title,
 void UIBackend::destroyWindow(Window *window)
 {
   auto plat_window = static_cast<PlatformWindow *>(window);
-  cleanupWindow(plat_window, gpuAPI);
+  cleanupWindow(plat_window, gpuLib);
   delete plat_window;
 }
 
 void UIBackend::destroyMainWindow()
 {
-  cleanupWindow(&mainWindow, gpuAPI);
+  cleanupWindow(&mainWindow, gpuLib);
 }
 
 void UserInputEvents::merge(const UserInputEvents &o)
@@ -749,9 +741,9 @@ const char * UISystem::inputText()
   return backend(this)->inputText;
 }
 
-GPUAPI * UISystem::gpuAPI()
+GPULib * UISystem::gpuLib()
 {
-  return backend(this)->gpuAPI;
+  return backend(this)->gpuLib;
 }
 
 }

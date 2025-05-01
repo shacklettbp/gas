@@ -1,11 +1,145 @@
 #include "gas.hpp"
 #include "backend_common.hpp"
 
+#include "wgpu_init.hpp"
+
 #include <brt/sync.hpp>
+
+#include <dlfcn.h>
+
+#if defined(BRT_LINUX) or defined(BRT_MACOS)
+#include <dlfcn.h>
+#elif defined(BRT_WINDOWS)
+#include "windows.hpp"
+#endif
 
 namespace gas {
 
 using namespace brt;
+
+GPUAPISelect GPULib::autoSelectAPI()
+{
+  return GPUAPISelect::WebGPU;
+}
+
+GPULib * GPULib::init(GPUAPISelect select,
+                      const APIConfig &cfg)
+{
+  switch (select) {
+  case GPUAPISelect::None: {
+    FATAL("Invalid GPU API selected");
+  } break;
+  case GPUAPISelect::Vulkan: {
+    FATAL("Not implemented");
+  } break;
+  case GPUAPISelect::Metal: {
+    FATAL("Not implemented");
+  } break;
+  case GPUAPISelect::WebGPU: {
+    return webgpu::initWebGPU(cfg);
+  } break;
+  default: {
+    BRT_UNREACHABLE();
+  } break;
+  }
+}
+
+ShaderCompilerLib loadShaderCompiler()
+{
+#if defined(BRT_WINDOWS)
+  const char *lib_name = "gas_shader_compiler.dll";
+
+  void *handle = LoadLibraryExA(
+      lib_name, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+  if (!handle) {
+    FATAL("Failed to load shader compiler library: %u", GetLastError());
+  }
+
+  auto startup_fn = (void (*)())GetProcAddress(
+      handle, "gasStartupShaderCompilerLib");
+
+  if (!startup_fn) {
+    FATAL("Failed to find startup function in shader compiler library: %u",
+          GetLastError());
+  }
+
+  startup_fn();
+
+  auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
+      handle, "gasCreateShaderCompiler");
+  auto destroy_fn = (void (*)(ShaderCompiler *))GetProcAddress(
+      handle, "gasDestroyShaderCompiler");
+
+  if (!create_fn || !destroy_fn) {
+    FATAL("Failed to find create / destroy functions in shader compiler library: %u",
+          GetLastError());
+  }
+
+  // Return the handle and the create function
+  return { handle, create_fn, destroy_fn };
+#elif defined(BRT_LINUX) or defined(BRT_MACOS)
+#ifdef BRT_LINUX
+  const char *lib_name = "libgas_shader_compiler.so";
+#else
+  const char *lib_name = "libgas_shader_compiler.dylib";
+#endif
+  void *lib = dlopen(lib_name, RTLD_NOW | RTLD_LOCAL);
+  if (!lib) {
+    FATAL("Failed to load shader compiler library: %s", dlerror());
+  }
+
+  auto startup_fn = (void (*)())dlsym(
+      lib, "gasStartupShaderCompilerLib");
+
+  if (!startup_fn) {
+    FATAL("Failed to find startup function in shader compiler library: %s",
+          dlerror());
+  }
+
+  startup_fn();
+
+  auto create_fn = (ShaderCompiler * (*)())dlsym(
+      lib, "gasCreateShaderCompiler");
+  auto destroy_fn = (void (*)(ShaderCompiler *))dlsym(
+      lib, "gasDestroyShaderCompiler");
+  if (!create_fn || !destroy_fn) {
+    FATAL("Failed to find create /destroy functions in shader compiler library: %s",
+          dlerror());
+  }
+
+  return { lib, create_fn, destroy_fn };
+#else 
+  FATAL("Shader compiler not supported");
+#endif
+}
+
+void unloadShaderCompiler(ShaderCompilerLib compiler_lib)
+{
+#if defined(BRT_WINDOWS)
+  auto shutdown_fn = (void (*)())GetProcAddress(
+      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+  if (!shutdown_fn) {
+    FATAL("Failed to shutdown shader compiler: %u", GetLastError());
+  }
+
+  shutdown_fn();
+  if (!FreeLibrary(compiler_lib.hdl)) {
+    FATAL("Failed to unload shader compiler library: %u", GetLastError());
+  }
+#elif defined(BRT_LINUX) or defined(BRT_MACOS)
+  auto shutdown_fn = (void (*)())dlsym(
+      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+  if (!shutdown_fn) {
+    FATAL("Failed to shutdown shader compiler: %s", dlerror());
+  }
+
+  shutdown_fn();
+  dlclose(compiler_lib.hdl);
+#else
+  (void)compiler_lib;
+  FATAL("Shader compiler not supported");
+#endif
+}
 
 ResourceUUIDMap::ResourceUUIDMap()
 {
@@ -135,14 +269,14 @@ ResourceUUIDMap::Hash ResourceUUIDMap::hash(UUID uuid)
   };
 }
 
-ErrorStatus GPURuntime::currentErrorStatus()
+ErrorStatus GPUDevice::currentErrorStatus()
 {
   auto *backend_common = static_cast<BackendCommon *>(this);
   AtomicU32Ref err_atomic(backend_common->errorStatus);
   return (ErrorStatus)err_atomic.load<sync::relaxed>();
 }
 
-FrontendCommands * GPURuntime::allocCommandBlock()
+FrontendCommands * GPUDevice::allocCommandBlock()
 {
   auto cmds = (FrontendCommands *)malloc(sizeof(FrontendCommands));
   cmds->next = nullptr;
@@ -150,7 +284,7 @@ FrontendCommands * GPURuntime::allocCommandBlock()
   return cmds;
 }
 
-void GPURuntime::deallocCommandBlocks(FrontendCommands *cmds)
+void GPUDevice::deallocCommandBlocks(FrontendCommands *cmds)
 {
   while (cmds != nullptr) {
     FrontendCommands *next = cmds->next;
@@ -160,7 +294,7 @@ void GPURuntime::deallocCommandBlocks(FrontendCommands *cmds)
 }
 
 BackendCommon::BackendCommon(bool errors_are_fatal)
-  : GPURuntime(),
+  : GPUDevice(),
     paramBlockTypeIDs(),
     rasterPassInterfaceIDs(),
     errorStatus((u32)ErrorStatus::None),

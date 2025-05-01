@@ -137,22 +137,22 @@ struct BackendQueueData {
   TmpParamBlockState tmpParamBlockState;
 };
 
-class WebGPUAPI final : public GPUAPI {
+class WebGPULib final : public GPULib {
 public:
   wgpu::Instance inst;
   WGPUDevice destroyingDevice;
   bool debugPipelineCompilation;
   bool errorsAreFatal;
 
-  static GPUAPI * init(const APIConfig &cfg);
+  static GPULib * init(const APIConfig &cfg);
   void shutdown() final;
 
   Surface createSurface(void *os_data, i32 width, i32 height) final;
   void destroySurface(Surface surface) final;
 
-  GPURuntime * createRuntime(
+  GPUDevice * createDevice(
       i32 gpu_idx, brt::Span<const Surface> surfaces) final;
-  void destroyRuntime(GPURuntime *runtime) final;
+  void destroyDevice(GPUDevice *gpu) final;
 
   ShaderByteCodeType backendShaderByteCodeType() final;
 };

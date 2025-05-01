@@ -22,7 +22,6 @@ include(gas-find-deps)
 list(APPEND GAS_CORE_SOURCES
   gas.hpp gas.inl gas.cpp
   backend_common.hpp 
-  init.hpp init.cpp
   mem.hpp mem.cpp
   linux.hpp windows.hpp
 )

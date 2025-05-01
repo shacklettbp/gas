@@ -9,10 +9,17 @@
 
 namespace gas {
 
+enum class GPUAPISelect : u32 {
+  None,
+  Vulkan,
+  Metal,
+  WebGPU,
+};
+
 struct APIConfig {
   bool enableValidation = false;
   bool debugPipelineCompilation = false;
-  bool runtimeErrorsAreFatal = false;
+  bool errorsAreFatal = false;
   bool enablePresent = false;
   brt::Span<const char *const> apiExtensions = {};
 };
@@ -587,19 +594,19 @@ static_assert(sizeof(FrontendCommands) == 4096);
 
 class CommandWriter {
 public:
-  inline u32 * reserve(GPURuntime *gpu);
-  inline void writeU32(GPURuntime *gpu, u32 v);
+  inline u32 * reserve(GPUDevice *gpu);
+  inline void writeU32(GPUDevice *gpu, u32 v);
 
   template <typename T>
-  inline void id(GPURuntime *gpu, T id);
-  inline void ctrl(GPURuntime *gpu, CommandCtrl ctrl);
+  inline void id(GPUDevice *gpu, T id);
+  inline void ctrl(GPUDevice *gpu, CommandCtrl ctrl);
 
 private:
   FrontendCommands *cmds_;
   u32 offset_;
 
 friend class CommandEncoder;
-friend class GPURuntime;
+friend class GPUDevice;
 };
 
 struct GPUTmpMemBlock
@@ -653,12 +660,12 @@ private:
 
   inline u32 allocGPUTmpInput(u32 num_bytes, u32 alignment);
 
-  inline RasterPassEncoder(GPURuntime *gpu,
+  inline RasterPassEncoder(GPUDevice *gpu,
                            CommandWriter writer,
                            GPUQueue queue,
                            GPUTmpMemBlock gpu_input);
 
-  GPURuntime *gpu_;
+  GPUDevice *gpu_;
   CommandWriter writer_;
   GPUQueue queue_;
   GPUTmpMemBlock gpu_input_;
@@ -698,10 +705,10 @@ public:
   inline MappedTmpBuffer tmpBuffer(u32 num_bytes, u32 alignment = 16);
 
 private:
-  inline CopyPassEncoder(GPURuntime *gpu, CommandWriter writer,
+  inline CopyPassEncoder(GPUDevice *gpu, CommandWriter writer,
                          GPUQueue queue, GPUTmpMemBlock tmp_staging);
 
-  GPURuntime *gpu_;
+  GPUDevice *gpu_;
   CommandWriter writer_;
   GPUQueue queue_;
   GPUTmpMemBlock tmp_staging_;
@@ -728,19 +735,19 @@ public:
   inline void endCopyPass(CopyPassEncoder &copy_enc);
 
 private:
-  inline CommandEncoder(GPURuntime *gpu, GPUQueue queue);
+  inline CommandEncoder(GPUDevice *gpu, GPUQueue queue);
 
-  GPURuntime *gpu_;
+  GPUDevice *gpu_;
   FrontendCommands *cmds_head_;
   CommandWriter cmd_writer_;
   GPUQueue queue_;
   GPUTmpMemBlock gpu_input_;
   GPUTmpMemBlock tmp_staging_;
 
-friend class GPURuntime;
+friend class GPUDevice;
 };
 
-class GPURuntime {
+class GPUDevice {
 public:
   // ==== Create & destroy buffers and textures  ==============================
   inline Buffer createBuffer(BufferInit init,
@@ -860,7 +867,7 @@ public:
   inline void destroyRasterPass(RasterPass interface);
 
   virtual void createRasterPasses(
-      i32 num_interfaces,
+      i32 num_passes,
       const RasterPassInit *pass_inits,
       RasterPass *handles_out) = 0;
   virtual void destroyRasterPasses(
@@ -920,29 +927,29 @@ friend class CommandWriter;
 
 class GPULib {
 public:
-  virtual inline ~GPULib() {};
+  static GPUAPISelect autoSelectAPI();
+  static GPULib * init(GPUAPISelect select, const APIConfig &cfg);
+
+  virtual void shutdown() = 0;
+
+  virtual Surface createSurface(void *os_data, i32 width, i32 height) = 0;
+  virtual void destroySurface(Surface surface) = 0;
+
+  virtual GPUDevice * createDevice(
+    i32 gpu_idx, brt::Span<const Surface> surfaces = {}) = 0;
+  virtual void destroyDevice(GPUDevice *gpu) = 0;
+
+  virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
 };
 
 struct ShaderCompilerLib {
   void *hdl;
   ShaderCompiler * (*createCompiler)();
   void (*destroyCompiler)(ShaderCompiler *shaderc);
+
+  void load();
+  void unload();
 };
-
-class GPUAPI {
-public:
-  virtual void shutdown() = 0;
-
-  virtual Surface createSurface(void *os_data, i32 width, i32 height) = 0;
-  virtual void destroySurface(Surface surface) = 0;
-
-  virtual GPURuntime * createRuntime(
-    i32 gpu_idx, brt::Span<const Surface> surfaces = {}) = 0;
-  virtual void destroyRuntime(GPURuntime *runtime) = 0;
-
-  virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
-};
-
 
 inline constexpr bool operator==(Swapchain a, Swapchain b);
 

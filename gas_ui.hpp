@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "gas.hpp"
-#include "init.hpp"
 
 namespace gas {
 
@@ -82,8 +81,8 @@ public:
   struct Config {
     bool enableValidation = false;
     bool debugPipelineCompilation = false;
-    bool runtimeErrorsAreFatal = false;
-    GPUAPISelect desiredGPUAPI = GPUAPISelect::None;
+    bool errorsAreFatal = false;
+    GPUAPISelect desiredGPULib = GPUAPISelect::None;
   };
 
   static UISystem * init(const Config &cfg);
@@ -116,7 +115,7 @@ public:
   UserInputEvents & inputEvents();
   const char * inputText();
 
-  GPUAPI * gpuAPI();
+  GPULib * gpuLib();
 };
 
 inline WindowState & operator|=(WindowState &a, WindowState b);
