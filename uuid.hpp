@@ -23,12 +23,12 @@ struct UUID {
   }
 };
 
-inline constexpr UUID operator "" _uuid(const char *str, size_t size)
+inline constexpr UUID operator ""_uuid(const char *str, size_t size)
 {
   return UUID::parse(str, size);
 }
 
-inline constexpr UUID operator "" _to_uuid(const char *str, size_t size)
+inline constexpr UUID operator ""_to_uuid(const char *str, size_t size)
 {
   return UUID::randomFromSeedString(str, size);
 }

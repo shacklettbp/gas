@@ -587,7 +587,7 @@ struct CopyCommand {
 // Used by backends
 struct FrontendCommands {
   std::array<u32, 1024 - 2> data;
-  FrontendCommands *next;
+  alignas(8) FrontendCommands *next;
 };
 
 static_assert(sizeof(FrontendCommands) == 4096);

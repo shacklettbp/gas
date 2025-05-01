@@ -15,8 +15,14 @@ if (GAS_USE_SDL)
   set(SDL_BUNDLED_DIR "${SDL_BUNDLED_DIR}" PARENT_SCOPE)
 endif()
 
+if (EMSCRIPTEN)
+  set(GAS_USE_DAWN_DEFAULT OFF)
+else ()
+  set(GAS_USE_DAWN_DEFAULT ON)
+endif()
 
-option(GAS_USE_DAWN "GAS use Dawn for native WebGPU support" TRUE)
+option(GAS_USE_DAWN "GAS use Dawn for native WebGPU support" ${GAS_USE_DAWN_DEFAULT})
+unset(GAS_USE_DAWN_DEFAULT)
 
 if (GAS_USE_DAWN)
   include(setup-dawn.cmake)
