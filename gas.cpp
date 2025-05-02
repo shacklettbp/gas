@@ -44,19 +44,19 @@ GPULib * GPULib::init(GPUAPISelect select,
   }
 }
 
-ShaderCompilerLib loadShaderCompiler()
+void ShaderCompilerLib::load()
 {
 #if defined(BRT_WINDOWS)
   const char *lib_name = "gas_shader_compiler.dll";
 
-  void *handle = LoadLibraryExA(
+  hdl = LoadLibraryExA(
       lib_name, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
-  if (!handle) {
+  if (!hdl) {
     FATAL("Failed to load shader compiler library: %u", GetLastError());
   }
 
   auto startup_fn = (void (*)())GetProcAddress(
-      handle, "gasStartupShaderCompilerLib");
+      hdl, "gasStartupShaderCompilerLib");
 
   if (!startup_fn) {
     FATAL("Failed to find startup function in shader compiler library: %u",
@@ -65,31 +65,28 @@ ShaderCompilerLib loadShaderCompiler()
 
   startup_fn();
 
-  auto create_fn = (ShaderCompiler * (*)())GetProcAddress(
-      handle, "gasCreateShaderCompiler");
-  auto destroy_fn = (void (*)(ShaderCompiler *))GetProcAddress(
-      handle, "gasDestroyShaderCompiler");
+  createCompiler = (ShaderCompiler * (*)())GetProcAddress(
+      hdl, "gasCreateShaderCompiler");
+  destroyCompiler = (void (*)(ShaderCompiler *))GetProcAddress(
+      hdl, "gasDestroyShaderCompiler");
 
-  if (!create_fn || !destroy_fn) {
+  if (!createCompiler || !destroyCompiler) {
     FATAL("Failed to find create / destroy functions in shader compiler library: %u",
           GetLastError());
   }
-
-  // Return the handle and the create function
-  return { handle, create_fn, destroy_fn };
 #elif defined(BRT_LINUX) or defined(BRT_MACOS)
 #ifdef BRT_LINUX
   const char *lib_name = "libgas_shader_compiler.so";
 #else
   const char *lib_name = "libgas_shader_compiler.dylib";
 #endif
-  void *lib = dlopen(lib_name, RTLD_NOW | RTLD_LOCAL);
-  if (!lib) {
+  hdl = dlopen(lib_name, RTLD_NOW | RTLD_LOCAL);
+  if (!hdl) {
     FATAL("Failed to load shader compiler library: %s", dlerror());
   }
 
   auto startup_fn = (void (*)())dlsym(
-      lib, "gasStartupShaderCompilerLib");
+      hdl, "gasStartupShaderCompilerLib");
 
   if (!startup_fn) {
     FATAL("Failed to find startup function in shader compiler library: %s",
@@ -98,45 +95,42 @@ ShaderCompilerLib loadShaderCompiler()
 
   startup_fn();
 
-  auto create_fn = (ShaderCompiler * (*)())dlsym(
-      lib, "gasCreateShaderCompiler");
-  auto destroy_fn = (void (*)(ShaderCompiler *))dlsym(
-      lib, "gasDestroyShaderCompiler");
-  if (!create_fn || !destroy_fn) {
+  createCompiler = (ShaderCompiler * (*)())dlsym(
+      hdl, "gasCreateShaderCompiler");
+  destroyCompiler = (void (*)(ShaderCompiler *))dlsym(
+      hdl, "gasDestroyShaderCompiler");
+  if (!createCompiler || !destroyCompiler) {
     FATAL("Failed to find create /destroy functions in shader compiler library: %s",
           dlerror());
   }
-
-  return { lib, create_fn, destroy_fn };
 #else 
   FATAL("Shader compiler not supported");
 #endif
 }
 
-void unloadShaderCompiler(ShaderCompilerLib compiler_lib)
+void ShaderCompilerLib::unload()
 {
 #if defined(BRT_WINDOWS)
   auto shutdown_fn = (void (*)())GetProcAddress(
-      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+      hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {
     FATAL("Failed to shutdown shader compiler: %u", GetLastError());
   }
 
   shutdown_fn();
-  if (!FreeLibrary(compiler_lib.hdl)) {
+  if (!FreeLibrary(hdl)) {
     FATAL("Failed to unload shader compiler library: %u", GetLastError());
   }
 #elif defined(BRT_LINUX) or defined(BRT_MACOS)
   auto shutdown_fn = (void (*)())dlsym(
-      compiler_lib.hdl, "gasShutdownShaderCompilerLib");
+      hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {
     FATAL("Failed to shutdown shader compiler: %s", dlerror());
   }
 
   shutdown_fn();
-  dlclose(compiler_lib.hdl);
+  dlclose(hdl);
 #else
-  (void)compiler_lib;
   FATAL("Shader compiler not supported");
 #endif
 }

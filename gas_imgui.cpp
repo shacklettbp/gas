@@ -1,9 +1,12 @@
 #include "gas_imgui.hpp"
 #include "shader_compiler.hpp"
 
-#include <madrona/crash.hpp>
+#include <brt/err.hpp>
 
 namespace gas {
+
+using namespace brt;
+
 namespace {
 
 struct VertexTransform {
@@ -24,7 +27,7 @@ struct ImGuiBackend {
   i32 fbHeight;
 };
 
-RasterShader loadShader(GPURuntime *gpu,
+RasterShader loadShader(GPUDevice *gpu,
                         ShaderCompiler *shaderc,
                         ParamBlockType param_block_type,
                         RasterPassInterface raster_pass)
@@ -64,7 +67,7 @@ RasterShader loadShader(GPURuntime *gpu,
   });
 }
 
-void loadFonts(GPURuntime *gpu,
+void loadFonts(GPUDevice *gpu,
                GPUQueue tx_queue,
                const char *font_path,
                float font_size)
@@ -108,7 +111,7 @@ void loadFonts(GPURuntime *gpu,
   io.Fonts->SetTexID((ImTextureID)(u64)bd->fontsParamBlock.uint());
 }
 
-void unloadFonts(GPURuntime *gpu)
+void unloadFonts(GPUDevice *gpu)
 {
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
@@ -174,7 +177,7 @@ ImGuiKey inputIDKeyToImGuiKey(InputID id)
 namespace ImGuiSystem {
 
 void init(UISystem *ui_sys,
-          GPURuntime *gpu,
+          GPUDevice *gpu,
           GPUQueue tx_queue,
           ShaderCompiler *shaderc,
           RasterPassInterface raster_pass_interface,
@@ -252,7 +255,7 @@ void init(UISystem *ui_sys,
   };
 }
 
-void shutdown(GPURuntime *gpu)
+void shutdown(GPUDevice *gpu)
 {
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
@@ -268,7 +271,7 @@ void shutdown(GPURuntime *gpu)
   io.BackendPlatformUserData = nullptr;
 }
 
-void reloadFonts(GPURuntime *gpu,
+void reloadFonts(GPUDevice *gpu,
                  GPUQueue tx_queue,
                  const char *font_path,
                  float font_size)

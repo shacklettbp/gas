@@ -36,7 +36,7 @@ add_library(gas_core STATIC
   ${GAS_CORE_SOURCES}
 )
 
-target_link_libraries(gas_core PRIVATE brt)
+target_link_libraries(gas_core PUBLIC brt)
 
 if (GAS_USE_DAWN)
   target_link_libraries(gas_core PRIVATE gas_dawn)
