@@ -164,9 +164,11 @@ endfunction()
 
 function(find_emdawn)
   add_library(gas_dawn INTERFACE)
-  target_compile_options(gas_dawn INTERFACE
-    --use-port=${DAWN_BUNDLED_DIR}/emdawnwebgpu.port.py
-  )
+
+  set(PORT_OPTION --use-port=${DAWN_BUNDLED_DIR}/emdawnwebgpu.port.py)
+
+  target_compile_options(gas_dawn INTERFACE ${PORT_OPTION})
+  target_link_options(gas_dawn INTERFACE ${PORT_OPTION})
 endfunction()
 
 if (GAS_USE_DAWN)
