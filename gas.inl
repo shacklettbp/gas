@@ -123,7 +123,7 @@ void CommandWriter::ctrl(GPUDevice *gpu, CommandCtrl ctrl)
 
 u32 GPUTmpMemBlock::alloc(u32 num_bytes, u32 alignment)
 {
-  u32 start = brt::roundToAlignment(offset, alignment);
+  u32 start = brt::roundUp(offset, alignment);
   offset = start + num_bytes;
   return start;
 }
@@ -259,7 +259,7 @@ u32 RasterPassEncoder::allocGPUTmpInput(u32 num_bytes, u32 alignment)
       state_.dataBuffer = gpu_input_.buffer;
     }
 
-    offset = brt::roundToAlignment(gpu_input_.offset, alignment);
+    offset = brt::roundUp(gpu_input_.offset, alignment);
     gpu_input_.offset = offset + num_bytes;
   }
 
@@ -583,7 +583,7 @@ MappedTmpBuffer CopyPassEncoder::tmpBuffer(u32 num_bytes, u32 alignment)
   if (tmp_staging_.blockFull()) [[unlikely]] {
     tmp_staging_ = gpu_->allocGPUTmpStagingBlock(queue_);
 
-    offset = brt::roundToAlignment(tmp_staging_.offset, alignment);
+    offset = brt::roundUp(tmp_staging_.offset, alignment);
     tmp_staging_.offset = offset + num_bytes;
   }
 
