@@ -937,6 +937,9 @@ public:
 
   virtual GPUDevice * createDevice(
     i32 gpu_idx, brt::Span<const Surface> surfaces = {}) = 0;
+  virtual void createDeviceAsync(
+      i32 gpu_idx, brt::Span<const Surface> surfaces,
+      void (*callback)(GPUDevice *, void *), void *cb_data) = 0;
   virtual void destroyDevice(GPUDevice *gpu) = 0;
 
   virtual ShaderByteCodeType backendShaderByteCodeType() = 0;

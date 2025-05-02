@@ -24,10 +24,34 @@ using namespace brt;
 
 namespace {
 
-struct InitDeviceResult {
-  wgpu::Adapter adapter;
-  wgpu::Device device;
-  BackendLimits limits;
+class InitDeviceRequest {
+public:
+  InitDeviceRequest(WebGPULib *lib, i32 device_idx,
+                  Span<const Surface> surfaces,
+                  void (*cb)(GPUDevice *, void *),
+                  void *cb_data,
+                  bool delete_when_done);
+
+  void busyWait();
+
+private:
+  WebGPULib *lib_;
+  i32 device_idx_;
+  void (*cb_)(GPUDevice *, void *);
+  void *cb_data_;
+  bool delete_when_done_;
+
+  wgpu::Adapter adapter_;
+  wgpu::Limits limits_;
+
+  wgpu::Future adapter_future_;
+  wgpu::Future device_future_;
+
+  void requestAdapterCB(wgpu::RequestAdapterStatus status,
+    wgpu::Adapter requested_adapter, const char *err_message);
+  void requestDeviceCB(wgpu::RequestDeviceStatus status,
+                       wgpu::Device requested_device,
+                       const char *message);
 };
 
 #ifndef EMSCRIPTEN
@@ -471,6 +495,10 @@ void WebGPULib::destroySurface(Surface surface)
 static wgpu::WaitStatus busyWaitForFuture(
     wgpu::Instance &inst, wgpu::Future future)
 {
+#ifdef EMSCRIPTEN
+  FATAL("Cannot busy wait on web!");
+#endif
+
   wgpu::WaitStatus wait_status;
   while ((wait_status = inst.WaitAny(future, 0)) ==
           wgpu::WaitStatus::TimedOut)
@@ -479,116 +507,152 @@ static wgpu::WaitStatus busyWaitForFuture(
   return wait_status;
 }
 
-static InitDeviceResult initDevice(
-  WebGPULib *api, i32 idx, Span<const Surface> surfaces)
+InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
+                                     Span<const Surface> surfaces,
+                                     void (*cb)(GPUDevice *, void *),
+                                     void *cb_data,
+                                     bool delete_when_done)
 {
+  lib_ = lib;
+  device_idx_ = device_idx;
+  cb_ = cb;
+  cb_data_ = cb_data;
+  delete_when_done_ = delete_when_done;
+
   // Cannot select specific GPU in webgpu
-  assert(idx == 0);
+  assert(device_idx_ == 0);
   assert(surfaces.size() <= 1); // Can only have one compatible surface
 
-  wgpu::Limits supported_limits;
-  wgpu::Adapter adapter;
-  {
-    wgpu::RequestAdapterOptions request_options {
-      .powerPreference = wgpu::PowerPreference::HighPerformance,
-    };
+  wgpu::RequestAdapterOptions request_options {
+    .powerPreference = wgpu::PowerPreference::HighPerformance,
+  };
 
-    if (surfaces.size() == 1) {
-      request_options.compatibleSurface =
-        wgpu::Surface((WGPUSurface)surfaces[0].hdl.ptr);
-    }
-
-    wgpu::Future future = api->inst.RequestAdapter(
-      &request_options, wgpu::CallbackMode::WaitAnyOnly,
-      [](wgpu::RequestAdapterStatus status, wgpu::Adapter returned_adapter,
-         const char *message, wgpu::Adapter *out_adapter)
-      {
-        if (status != wgpu::RequestAdapterStatus::Success) {
-          FATAL("Requesting adapter failed: %s", message);
-        }
-
-       *out_adapter = returned_adapter;
-      }, &adapter);
-
-    wgpu::WaitStatus wait_status = busyWaitForFuture(api->inst, future);
-    if (wait_status != wgpu::WaitStatus::Success) {
-      FATAL("Requesting adapter failed during wait: %d", (int)wait_status);
-    }
-
-    wgpu::Status limits_status = adapter.GetLimits(&supported_limits);
-    if (limits_status != wgpu::Status::Success) {
-      FATAL("Failed to get supported limits from adapter");
-    }
+  if (surfaces.size() == 1) {
+    request_options.compatibleSurface.Acquire((WGPUSurface)surfaces[0].hdl.ptr);
   }
 
-  if (supported_limits.maxUniformBufferBindingSize > 65536) {
-    supported_limits.maxUniformBufferBindingSize = 65536;
+  auto request_adapter_wrapper = [](
+    wgpu::RequestAdapterStatus status, wgpu::Adapter adapter,
+    const char *err_message, InitDeviceRequest *request)
+  {
+    request->requestAdapterCB(status, adapter, err_message);
+  };
+
+  adapter_future_ = lib->inst.RequestAdapter(
+    &request_options, wgpu::CallbackMode::AllowSpontaneous,
+    request_adapter_wrapper, this);
+}
+
+void InitDeviceRequest::busyWait()
+{
+  wgpu::WaitStatus wait_status = busyWaitForFuture(lib_->inst, adapter_future_);
+  if (wait_status != wgpu::WaitStatus::Success) {
+    FATAL("Requesting adapter failed during wait");
   }
 
-  wgpu::Device device;
-  {
-    wgpu::Limits required_limits {};
-    required_limits.maxUniformBufferBindingSize =
-        supported_limits.maxUniformBufferBindingSize;
+  wait_status = busyWaitForFuture(lib_->inst, device_future_);
+  if (wait_status != wgpu::WaitStatus::Success) {
+    FATAL("Requesting device failed during wait");
+  }
+}
 
-    wgpu::DeviceDescriptor dev_desc;
-    dev_desc.requiredLimits = &required_limits;
+void InitDeviceRequest::requestAdapterCB(
+    wgpu::RequestAdapterStatus status, wgpu::Adapter requested_adapter,
+    const char *err_message)
+{
+  if (status != wgpu::RequestAdapterStatus::Success) {
+    FATAL("Requesting adapter failed: %s", err_message);
+  }
+
+  adapter_ = requested_adapter;
+
+  wgpu::Status limits_status = adapter_.GetLimits(&limits_);
+  if (limits_status != wgpu::Status::Success) {
+    FATAL("Failed to get supported limits from adapter");
+  }
+  if (limits_.maxUniformBufferBindingSize > 65536) {
+    limits_.maxUniformBufferBindingSize = 65536;
+  }
+
+  wgpu::DeviceDescriptor dev_desc;
+  dev_desc.requiredLimits = &limits_;
 
 #ifndef EMSCRIPTEN
-    wgpu::DawnTogglesDescriptor dev_toggles_desc;
-    auto toggles = std::to_array({"dump_shaders"});
-    dev_toggles_desc.enabledToggleCount = 1;
-    dev_toggles_desc.enabledToggles = toggles.data();
+  wgpu::DawnTogglesDescriptor dev_toggles_desc;
+  auto toggles = std::to_array({"dump_shaders"});
+  dev_toggles_desc.enabledToggleCount = 1;
+  dev_toggles_desc.enabledToggles = toggles.data();
 
-    if (api->debugPipelineCompilation) {
-      dev_desc.nextInChain = &dev_toggles_desc;
-    }
+  if (lib_->debugPipelineCompilation) {
+    dev_desc.nextInChain = &dev_toggles_desc;
+  }
 #endif
 
-    dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
-                                   deviceLostCB, &api->destroyingDevice);
-    dev_desc.SetUncapturedErrorCallback(uncapturedErrorCB, (void *)nullptr);
+  dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
+                                 deviceLostCB, &lib_->destroyingDevice);
+  dev_desc.SetUncapturedErrorCallback(uncapturedErrorCB, (void *)nullptr);
 
-    wgpu::Future future = adapter.RequestDevice(
-      &dev_desc, wgpu::CallbackMode::WaitAnyOnly,
-      [](wgpu::RequestDeviceStatus status, wgpu::Device returned_device,
-         const char *message, wgpu::Device *out_device)
-      {
-        if (status != wgpu::RequestDeviceStatus::Success) {
-          FATAL("Requesting device failed: %s", message);
-        }
+  auto request_device_wrapper =  [](wgpu::RequestDeviceStatus status,
+                                    wgpu::Device requested_device,
+                                    const char *message,
+                                    InitDeviceRequest *request)
+  {
+    request->requestDeviceCB(status, requested_device, message);
+  };
 
-        *out_device = returned_device;
-      }, &device);
-
-    wgpu::WaitStatus wait_status = busyWaitForFuture(api->inst, future);
-
-    if (wait_status != wgpu::WaitStatus::Success) {
-      FATAL("Requesting device failed during wait");
-    }
+  device_future_ = adapter_.RequestDevice(
+    &dev_desc, wgpu::CallbackMode::AllowSpontaneous,
+    request_device_wrapper, this);
+}
+  
+void InitDeviceRequest::requestDeviceCB(wgpu::RequestDeviceStatus status,
+                                        wgpu::Device device,
+                                        const char *message)
+{
+  if (status != wgpu::RequestDeviceStatus::Success) {
+    FATAL("Requesting device failed: %s", message);
   }
 
 #ifndef EMSCRIPTEN
   device.SetLoggingCallback(deviceLoggingCB, (void *)nullptr);
 #endif
 
-  BackendLimits out_limits {
-    .maxNumUniformBytes =
-        (u32)supported_limits.maxUniformBufferBindingSize,
+  wgpu::Queue queue = device.GetQueue();
+
+  BackendLimits backend_limits {
+    .maxNumUniformBytes = (u32)limits_.maxUniformBufferBindingSize ,
   };
 
-  return { std::move(adapter), std::move(device), out_limits };
+  Backend *backend =  new Backend(
+    std::move(adapter_), std::move(device), std::move(queue),
+    lib_->inst, backend_limits, lib_->errorsAreFatal);
+  cb_(backend, cb_data_);
+
+  if (delete_when_done_) {
+    delete this;
+  }
 }
 
 GPUDevice * WebGPULib::createDevice(
     i32 gpu_idx, Span<const Surface> surfaces)
 {
-  auto [adapter, device, limits] = initDevice(this, gpu_idx, surfaces);
+  GPUDevice *out;
 
-  wgpu::Queue queue = device.GetQueue();
+  auto cb = [](GPUDevice *dev, void *out_ptr) {
+    *(GPUDevice **)out_ptr = dev;
+  };
 
-  return new Backend(std::move(adapter), std::move(device), std::move(queue),
-                     inst, limits, errorsAreFatal);
+  InitDeviceRequest request(this, gpu_idx, surfaces, cb, (void *)&out, false);
+  request.busyWait();
+
+  return out;
+}
+
+void WebGPULib::createDeviceAsync(
+    i32 gpu_idx, Span<const Surface> surfaces,
+    void (*cb)(GPUDevice *, void *), void *cb_data)
+{
+  new InitDeviceRequest(this, gpu_idx, surfaces, cb, cb_data, true);
 }
 
 void WebGPULib::destroyDevice(GPUDevice *gpu)

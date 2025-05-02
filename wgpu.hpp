@@ -152,6 +152,9 @@ public:
 
   GPUDevice * createDevice(
       i32 gpu_idx, brt::Span<const Surface> surfaces) final;
+  void createDeviceAsync(
+      i32 gpu_idx, brt::Span<const Surface> surfaces,
+      void (*callback)(GPUDevice *, void *), void *cb_data) final;
   void destroyDevice(GPUDevice *gpu) final;
 
   ShaderByteCodeType backendShaderByteCodeType() final;
