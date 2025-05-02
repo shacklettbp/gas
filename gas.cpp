@@ -7,9 +7,9 @@
 
 #include <dlfcn.h>
 
-#if defined(BRT_LINUX) or defined(BRT_MACOS)
+#if defined(BRT_OS_LINUX) or defined(BRT_OS_MACOS)
 #include <dlfcn.h>
-#elif defined(BRT_WINDOWS)
+#elif defined(BRT_OS_WINDOWS)
 #include "windows.hpp"
 #endif
 
@@ -46,7 +46,7 @@ GPULib * GPULib::init(GPUAPISelect select,
 
 void ShaderCompilerLib::load()
 {
-#if defined(BRT_WINDOWS)
+#if defined(BRT_OS_WINDOWS)
   const char *lib_name = "gas_shader_compiler.dll";
 
   hdl = LoadLibraryExA(
@@ -74,8 +74,8 @@ void ShaderCompilerLib::load()
     FATAL("Failed to find create / destroy functions in shader compiler library: %u",
           GetLastError());
   }
-#elif defined(BRT_LINUX) or defined(BRT_MACOS)
-#ifdef BRT_LINUX
+#elif defined(BRT_OS_LINUX) or defined(BRT_OS_MACOS)
+#ifdef BRT_OS_LINUX
   const char *lib_name = "libgas_shader_compiler.so";
 #else
   const char *lib_name = "libgas_shader_compiler.dylib";
@@ -110,7 +110,7 @@ void ShaderCompilerLib::load()
 
 void ShaderCompilerLib::unload()
 {
-#if defined(BRT_WINDOWS)
+#if defined(BRT_OS_WINDOWS)
   auto shutdown_fn = (void (*)())GetProcAddress(
       hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {
@@ -121,7 +121,7 @@ void ShaderCompilerLib::unload()
   if (!FreeLibrary(hdl)) {
     FATAL("Failed to unload shader compiler library: %u", GetLastError());
   }
-#elif defined(BRT_LINUX) or defined(BRT_MACOS)
+#elif defined(BRT_OS_LINUX) or defined(BRT_OS_MACOS)
   auto shutdown_fn = (void (*)())dlsym(
       hdl, "gasShutdownShaderCompilerLib");
   if (!shutdown_fn) {

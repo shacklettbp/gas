@@ -78,7 +78,7 @@ if (NOT EMSCRIPTEN)
     shader_compiler.hpp shader_compiler.inl shader_compiler.cpp
   )
   target_link_libraries(gas_shader_compiler PRIVATE
-    gas_slang
+    gas_slang brt
   )
   
   function(gas_link_hermetic_libcxx tgt)
@@ -114,7 +114,7 @@ if (NOT EMSCRIPTEN)
     endif()
   
     target_link_libraries(gas_shader_compiler PRIVATE
-      gas_dawn gas_dawn_tint brt)
+      gas_dawn gas_dawn_tint)
   endif()
 endif()
 

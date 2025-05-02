@@ -528,14 +528,14 @@ InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
   };
 
   if (surfaces.size() == 1) {
-    request_options.compatibleSurface.Acquire((WGPUSurface)surfaces[0].hdl.ptr);
+    request_options.compatibleSurface = wgpu::Surface((WGPUSurface)surfaces[0].hdl.ptr);
   }
 
   auto request_adapter_wrapper = [](
     wgpu::RequestAdapterStatus status, wgpu::Adapter adapter,
     const char *err_message, InitDeviceRequest *request)
   {
-    request->requestAdapterCB(status, adapter, err_message);
+    request->requestAdapterCB(status, std::move(adapter), err_message);
   };
 
   adapter_future_ = lib->inst.RequestAdapter(
@@ -564,7 +564,7 @@ void InitDeviceRequest::requestAdapterCB(
     FATAL("Requesting adapter failed: %s", err_message);
   }
 
-  adapter_ = requested_adapter;
+  adapter_ = std::move(requested_adapter);
 
   wgpu::Status limits_status = adapter_.GetLimits(&limits_);
   if (limits_status != wgpu::Status::Success) {
@@ -597,7 +597,7 @@ void InitDeviceRequest::requestAdapterCB(
                                     const char *message,
                                     InitDeviceRequest *request)
   {
-    request->requestDeviceCB(status, requested_device, message);
+    request->requestDeviceCB(status, std::move(requested_device), message);
   };
 
   device_future_ = adapter_.RequestDevice(
@@ -623,7 +623,7 @@ void InitDeviceRequest::requestDeviceCB(wgpu::RequestDeviceStatus status,
     .maxNumUniformBytes = (u32)limits_.maxUniformBufferBindingSize ,
   };
 
-  Backend *backend =  new Backend(
+  Backend *backend = new Backend(
     std::move(adapter_), std::move(device), std::move(queue),
     lib_->inst, backend_limits, lib_->errorsAreFatal);
   cb_(backend, cb_data_);
