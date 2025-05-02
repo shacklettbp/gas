@@ -73,7 +73,6 @@ function(find_dawn)
   get_target_property(DAWN_COMPILE_DEFS 
       dawn::webgpu_dawn INTERFACE_COMPILE_DEFINITIONS)
   target_compile_definitions(gas_dawn INTERFACE
-    GAS_SUPPORT_WEBGPU=1
     ${DAWN_COMPILE_DEFS}
   )
 
@@ -177,6 +176,9 @@ if (GAS_USE_DAWN)
   else()
     find_dawn()
   endif()
+  target_compile_definitions(gas_dawn INTERFACE
+    GAS_SUPPORT_WEBGPU=1
+  )
 endif()
 unset(find_dawn)
 unset(find_emdawn)

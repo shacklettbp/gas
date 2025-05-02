@@ -40,10 +40,6 @@ target_link_libraries(gas_core PUBLIC brt)
 
 if (GAS_USE_DAWN)
   target_link_libraries(gas_core PRIVATE gas_dawn)
-elseif (EMSCRIPTEN)
-  target_compile_definitions(gas_core PRIVATE 
-    GAS_SUPPORT_WEBGPU=1
-  )
 endif()
 
 add_library(gas_ui STATIC
