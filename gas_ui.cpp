@@ -279,6 +279,8 @@ static void initWindow(PlatformWindow *window_out,
   };
 
   os_hdl_ptr = &win32_hdl;
+#elif defined(SDL_PLATFORM_EMSCRIPTEN)
+  os_hdl_ptr = (void *)title;
 #else
   static_assert(false, "Unimplemented");
 #endif

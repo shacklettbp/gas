@@ -27,10 +27,10 @@ namespace {
 class InitDeviceRequest {
 public:
   InitDeviceRequest(WebGPULib *lib, i32 device_idx,
-                  Span<const Surface> surfaces,
-                  void (*cb)(GPUDevice *, void *),
-                  void *cb_data,
-                  bool delete_when_done);
+                    Span<const Surface> surfaces,
+                    void (*cb)(GPUDevice *, void *),
+                    void *cb_data,
+                    bool delete_when_done);
 
   void busyWait();
 
@@ -41,63 +41,72 @@ private:
   void *cb_data_;
   bool delete_when_done_;
 
-  wgpu::Adapter adapter_;
-  wgpu::Limits limits_;
+  WGPUAdapter adapter_;
+  WGPULimits limits_;
 
-  wgpu::Future adapter_future_;
-  wgpu::Future device_future_;
+  WGPUFuture adapter_future_;
+  WGPUFuture device_future_;
 
-  void requestAdapterCB(wgpu::RequestAdapterStatus status,
-    wgpu::Adapter requested_adapter, const char *err_message);
-  void requestDeviceCB(wgpu::RequestDeviceStatus status,
-                       wgpu::Device requested_device,
-                       const char *message);
+  void requestAdapterCB(WGPURequestAdapterStatus status,
+                        WGPUAdapter requested_adapter,
+                        WGPUStringView err_msg);
+  void requestDeviceCB(WGPURequestDeviceStatus status,
+                       WGPUDevice requested_device,
+                       WGPUStringView err_msg);
 };
 
 #ifndef EMSCRIPTEN
 void instanceLoggingCB(wgpu::LoggingType type,
                        wgpu::StringView message,
-                       void *user_data)
+                       void *userdata)
 {
   (void)type;
-  (void)user_data;
+  (void)userdata;
   fprintf(stderr, " Instance Logging: %s\n", message.data);
 }
 
-void deviceLoggingCB(wgpu::LoggingType type,
-                     wgpu::StringView message,
-                     void *user_data)
+void deviceLoggingCB(WGPULoggingType type,
+                     WGPUStringView message,
+                     void *userdata1,
+                     void *userdata2)
 {
   (void)type;
-  (void)user_data;
-  fprintf(stderr, " Device Logging: %s\n", message.data);
+  (void)userdata1;
+  (void)userdata2;
+  fprintf(stderr, " Device Logging: %.*s\n", (int)message.length, message.data);
 }
 #endif
 
-void deviceLostCB(const wgpu::Device &wgpu_dev,
-                  wgpu::DeviceLostReason lost_reason,
-                  wgpu::StringView message,
-                  WGPUDevice *destroying_device)
+void deviceLostCB(const WGPUDevice *wgpu_dev,
+                  WGPUDeviceLostReason lost_reason,
+                  WGPUStringView message,
+                  void *userdata1,
+                  void *userdata2)
 {
   (void)lost_reason;
+  (void)userdata2;
 
-  if (wgpu_dev.Get() == *destroying_device) {
+  WGPUDevice *destroying_device = (WGPUDevice *)userdata1;
+
+  if (*wgpu_dev == *destroying_device) {
     return;
   }
 
-  FATAL(" device lost: %s", message.data);
+  FATAL("WGPU device lost: %.*s", (int)message.length, message.data);
 }
 
-void uncapturedErrorCB(const wgpu::Device &wgpu_dev,
-                       wgpu::ErrorType error_type,
-                       wgpu::StringView message,
-                       void *user_data)
+void uncapturedErrorCB(const WGPUDevice *wgpu_dev,
+                       WGPUErrorType error_type,
+                       WGPUStringView message,
+                       void *userdata1,
+                       void *userdata2)
 {
   (void)wgpu_dev;
   (void)error_type;
-  (void)user_data;
+  (void)userdata1;
+  (void)userdata2;
 
-  fprintf(stderr, " uncaptured error: %s\n", message.data);
+  fprintf(stderr, " uncaptured error: %.*s\n", (int)message.length, message.data);
   debuggerBreakPoint();
 }
 
@@ -468,6 +477,7 @@ Surface WebGPULib::createSurface(void *os_data, i32 width, i32 height)
 
   wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas_desc {};
   canvas_desc.selector = selector;
+  printf("selector: %s\n", selector);
 
   wgpu::SurfaceDescriptor surface_desc {
     .nextInChain = &canvas_desc,
@@ -492,16 +502,16 @@ void WebGPULib::destroySurface(Surface surface)
   wgpuSurfaceRelease((WGPUSurface)surface.hdl.ptr);
 } 
 
-static wgpu::WaitStatus busyWaitForFuture(
-    wgpu::Instance &inst, wgpu::Future future)
+static WGPUWaitStatus busyWaitForFuture(WGPUInstance inst, WGPUFuture future)
 {
-#ifdef EMSCRIPTEN
-  FATAL("Cannot busy wait on web!");
-#endif
+  WGPUFutureWaitInfo wait_info {
+    .future = future,
+    .completed = false,
+  };
 
-  wgpu::WaitStatus wait_status;
-  while ((wait_status = inst.WaitAny(future, 0)) ==
-          wgpu::WaitStatus::TimedOut)
+  WGPUWaitStatus wait_status;
+  while ((wait_status = wgpuInstanceWaitAny(inst, 1, &wait_info, 0)) ==
+          WGPUWaitStatus_TimedOut)
   {}
 
   return wait_status;
@@ -520,111 +530,138 @@ InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
   delete_when_done_ = delete_when_done;
 
   // Cannot select specific GPU in webgpu
-  assert(device_idx_ == 0);
-  assert(surfaces.size() <= 1); // Can only have one compatible surface
+  chk(device_idx_ == 0);
+  chk(surfaces.size() <= 1); // Can only have one compatible surface
 
-  wgpu::RequestAdapterOptions request_options {
-    .powerPreference = wgpu::PowerPreference::HighPerformance,
-  };
+  WGPURequestAdapterOptions request_options {};
+  request_options.powerPreference = WGPUPowerPreference_HighPerformance;
 
   if (surfaces.size() == 1) {
-    request_options.compatibleSurface = wgpu::Surface((WGPUSurface)surfaces[0].hdl.ptr);
+    request_options.compatibleSurface = (WGPUSurface)surfaces[0].hdl.ptr;
   }
 
   auto request_adapter_wrapper = [](
-    wgpu::RequestAdapterStatus status, wgpu::Adapter adapter,
-    const char *err_message, InitDeviceRequest *request)
+    WGPURequestAdapterStatus status, WGPUAdapter adapter,
+    WGPUStringView err_msg, void *request_raw_ptr, void *)
   {
-    request->requestAdapterCB(status, std::move(adapter), err_message);
+    InitDeviceRequest *request = (InitDeviceRequest *)request_raw_ptr;
+    request->requestAdapterCB(status, adapter, err_msg);
   };
 
-  adapter_future_ = lib->inst.RequestAdapter(
-    &request_options, wgpu::CallbackMode::AllowSpontaneous,
-    request_adapter_wrapper, this);
+  adapter_future_ = wgpuInstanceRequestAdapter(
+    lib->inst.Get(), &request_options, WGPURequestAdapterCallbackInfo {
+      .nextInChain = nullptr,
+      .mode = WGPUCallbackMode_AllowSpontaneous,
+      .callback = request_adapter_wrapper,
+      .userdata1 = this,
+      .userdata2 = nullptr,
+    });
 }
 
 void InitDeviceRequest::busyWait()
 {
-  wgpu::WaitStatus wait_status = busyWaitForFuture(lib_->inst, adapter_future_);
-  if (wait_status != wgpu::WaitStatus::Success) {
+  WGPUWaitStatus wait_status = busyWaitForFuture(lib_->inst.Get(), adapter_future_);
+  if (wait_status != WGPUWaitStatus_Success) {
     FATAL("Requesting adapter failed during wait");
   }
 
-  wait_status = busyWaitForFuture(lib_->inst, device_future_);
-  if (wait_status != wgpu::WaitStatus::Success) {
+  wait_status = busyWaitForFuture(lib_->inst.Get(), device_future_);
+  if (wait_status != WGPUWaitStatus_Success) {
     FATAL("Requesting device failed during wait");
   }
 }
 
 void InitDeviceRequest::requestAdapterCB(
-    wgpu::RequestAdapterStatus status, wgpu::Adapter requested_adapter,
-    const char *err_message)
+    WGPURequestAdapterStatus status, WGPUAdapter requested_adapter,
+    WGPUStringView err_msg)
 {
-  if (status != wgpu::RequestAdapterStatus::Success) {
-    FATAL("Requesting adapter failed: %s", err_message);
+  if (status != WGPURequestAdapterStatus_Success) {
+    FATAL("Requesting adapter failed: %.*s", err_msg.length, err_msg.data);
   }
 
   adapter_ = std::move(requested_adapter);
 
-  wgpu::Status limits_status = adapter_.GetLimits(&limits_);
-  if (limits_status != wgpu::Status::Success) {
+  WGPUStatus limits_status = wgpuAdapterGetLimits(adapter_, &limits_);
+  if (limits_status != WGPUStatus_Success) {
     FATAL("Failed to get supported limits from adapter");
   }
   if (limits_.maxUniformBufferBindingSize > 65536) {
     limits_.maxUniformBufferBindingSize = 65536;
   }
 
-  wgpu::DeviceDescriptor dev_desc;
+  WGPUDeviceDescriptor dev_desc {};
   dev_desc.requiredLimits = &limits_;
 
 #ifndef EMSCRIPTEN
-  wgpu::DawnTogglesDescriptor dev_toggles_desc;
+  WGPUDawnTogglesDescriptor dev_toggles_desc {};
   auto toggles = std::to_array({"dump_shaders"});
   dev_toggles_desc.enabledToggleCount = 1;
   dev_toggles_desc.enabledToggles = toggles.data();
 
   if (lib_->debugPipelineCompilation) {
-    dev_desc.nextInChain = &dev_toggles_desc;
+    dev_desc.nextInChain = &dev_toggles_desc.chain;
   }
 #endif
 
-  dev_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
-                                 deviceLostCB, &lib_->destroyingDevice);
-  dev_desc.SetUncapturedErrorCallback(uncapturedErrorCB, (void *)nullptr);
+  dev_desc.deviceLostCallbackInfo = WGPUDeviceLostCallbackInfo {
+    .nextInChain = nullptr,
+    .mode = WGPUCallbackMode_AllowSpontaneous,
+    .callback = deviceLostCB,
+    .userdata1 = &lib_->destroyingDevice,
+    .userdata2 = nullptr,
+  };
 
-  auto request_device_wrapper =  [](wgpu::RequestDeviceStatus status,
-                                    wgpu::Device requested_device,
-                                    const char *message,
-                                    InitDeviceRequest *request)
+  dev_desc.uncapturedErrorCallbackInfo = WGPUUncapturedErrorCallbackInfo {
+    .nextInChain = nullptr,
+    .callback = uncapturedErrorCB,
+    .userdata1 = nullptr,
+    .userdata2 = nullptr,
+  };
+
+  auto request_device_wrapper =  [](WGPURequestDeviceStatus status,
+                                    WGPUDevice requested_device,
+                                    WGPUStringView message,
+                                    void *request_raw_ptr, void *)
   {
+    InitDeviceRequest *request = (InitDeviceRequest *)request_raw_ptr;
     request->requestDeviceCB(status, std::move(requested_device), message);
   };
 
-  device_future_ = adapter_.RequestDevice(
-    &dev_desc, wgpu::CallbackMode::AllowSpontaneous,
-    request_device_wrapper, this);
+  device_future_ = wgpuAdapterRequestDevice(
+    adapter_, &dev_desc, WGPURequestDeviceCallbackInfo {
+      .nextInChain = nullptr,
+      .mode = WGPUCallbackMode_AllowSpontaneous,
+      .callback = request_device_wrapper,
+      .userdata1 = this,
+      .userdata2 = nullptr,
+    });
 }
   
-void InitDeviceRequest::requestDeviceCB(wgpu::RequestDeviceStatus status,
-                                        wgpu::Device device,
-                                        const char *message)
+void InitDeviceRequest::requestDeviceCB(WGPURequestDeviceStatus status,
+                                        WGPUDevice device,
+                                        WGPUStringView message)
 {
-  if (status != wgpu::RequestDeviceStatus::Success) {
-    FATAL("Requesting device failed: %s", message);
+  if (status != WGPURequestDeviceStatus_Success) {
+    FATAL("Requesting device failed: %.*s", message.length, message.data);
   }
 
 #ifndef EMSCRIPTEN
-  device.SetLoggingCallback(deviceLoggingCB, (void *)nullptr);
+  wgpuDeviceSetLoggingCallback(device, WGPULoggingCallbackInfo {
+    .nextInChain = nullptr,
+    .callback = deviceLoggingCB,
+    .userdata1 = nullptr,
+    .userdata2 = nullptr,
+  });
 #endif
 
-  wgpu::Queue queue = device.GetQueue();
+  WGPUQueue queue = wgpuDeviceGetQueue(device);
 
   BackendLimits backend_limits {
     .maxNumUniformBytes = (u32)limits_.maxUniformBufferBindingSize ,
   };
 
   Backend *backend = new Backend(
-    std::move(adapter_), std::move(device), std::move(queue),
+    adapter_, device, queue,
     lib_->inst, backend_limits, lib_->errorsAreFatal);
   cb_(backend, cb_data_);
 
@@ -759,12 +796,12 @@ void Backend::destroy()
       gpu_tmp_input.tmpBufferHandlesBase, MAX_TMP_BUFFERS_PER_QUEUE);
 
     TmpParamBlockState &tmp_param_block_state = queue_data.tmpParamBlockState;
-    assert(tmp_param_block_state.numLive == 0);
+    chk(tmp_param_block_state.numLive == 0);
     paramBlocks.releaseRows(tmp_param_block_state.baseHandleOffset,
                             MAX_TMP_PARAM_BLOCKS_PER_QUEUE);
   }
 
-  assert(stagingBelt.numFree == stagingBelt.numAllocated);
+  chk(stagingBelt.numFree == stagingBelt.numAllocated);
   for (i32 i = 0; i < stagingBelt.numAllocated; i++) {
     stagingBelt.buffers[i].Unmap();
     stagingBelt.buffers[i].Destroy();
@@ -827,7 +864,7 @@ void Backend::createGPUResources(i32 num_buffers,
     }
     
     // FIXME move to validation
-    assert(tx_queue.id != -1);
+    chk(tx_queue.id != -1);
 
     u32 offset = staging_block.alloc(num_bytes, 4);
     if (staging_block.blockFull()) {
@@ -941,7 +978,7 @@ void Backend::createGPUResources(i32 num_buffers,
 
     texture_handles_out[tex_idx] = id;
 
-    assert(tex_init.numMipLevels == 1);
+    chk(tex_init.numMipLevels == 1);
     u32 num_bytes = width * height * depth * bytes_per_texel;
 
     if (staging.ptr) {
@@ -1067,8 +1104,8 @@ void Backend::prepareStagingBuffers(i32 num_buffers,
         wgpu::MapMode::Write, 0, WGPU_WHOLE_MAP_SIZE,
         wgpu::CallbackMode::WaitAnyOnly, map_cb, (void *)nullptr);
 
-    wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
-    assert(map_wait_status == wgpu::WaitStatus::Success);
+    WGPUWaitStatus map_wait_status = busyWaitForFuture(inst.Get(), map_future);
+    chk(map_wait_status == WGPUWaitStatus_Success);
 
     mapped_out[buf_idx] = to_buffer->GetMappedRange();
   }
@@ -1136,8 +1173,8 @@ void * Backend::beginReadback(Buffer buffer)
       wgpu::MapMode::Read, 0, WGPU_WHOLE_MAP_SIZE,
       wgpu::CallbackMode::WaitAnyOnly, map_cb, &map_status);
 
-  wgpu::WaitStatus map_wait_status = busyWaitForFuture(inst, map_future);
-  if (map_wait_status != wgpu::WaitStatus::Success) {
+  WGPUWaitStatus map_wait_status = busyWaitForFuture(inst.Get(), map_future);
+  if (map_wait_status != WGPUWaitStatus_Success) {
     FATAL("Failed to wait while mapping readback buffer: %lu",
           (u64)map_wait_status);
   }
@@ -1147,7 +1184,7 @@ void * Backend::beginReadback(Buffer buffer)
           (u64)map_wait_status);
   }
 
-  assert(to_buffer->GetMapState() == wgpu::BufferMapState::Mapped);
+  chk(to_buffer->GetMapState() == wgpu::BufferMapState::Mapped);
 
   return (void *)to_buffer->GetConstMappedRange();
 }
@@ -1272,7 +1309,7 @@ void Backend::createParamBlockTypes(
          buffer_binding_idx++) {
       const BufferBindingConfig buffer_cfg =
         type_init.buffers[buffer_binding_idx];
-      assert(buffer_cfg.numBuffers == 1);
+      chk(buffer_cfg.numBuffers == 1);
 
       i32 binding = buffer_cfg.bindLocation;
       if (binding == -1) {
@@ -1297,7 +1334,7 @@ void Backend::createParamBlockTypes(
          texture_binding_idx++) {
       const TextureBindingConfig texture_cfg =
         type_init.textures[texture_binding_idx];
-      assert(texture_cfg.numTextures == 1);
+      chk(texture_cfg.numTextures == 1);
 
       i32 binding = texture_cfg.bindLocation;
       if (binding == -1) {
@@ -1348,7 +1385,7 @@ void Backend::createParamBlockTypes(
          sampler_binding_idx++) {
       const SamplerBindingConfig sampler_cfg =
         type_init.samplers[sampler_binding_idx];
-      assert(sampler_cfg.numSamplers == 1);
+      chk(sampler_cfg.numSamplers == 1);
 
       i32 binding = sampler_cfg.bindLocation;
       if (binding == -1) {
@@ -1445,7 +1482,7 @@ ParamBlock Backend::createTemporaryParamBlock(
   TmpParamBlockState &tmp_state = queueDatas[queue_hdl.id].tmpParamBlockState;
 
   i32 tmp_idx = AtomicU32Ref(tmp_state.numLive).fetch_add_relaxed(1);
-  assert(tmp_idx < MAX_TMP_PARAM_BLOCKS_PER_QUEUE);
+  chk(tmp_idx < MAX_TMP_PARAM_BLOCKS_PER_QUEUE);
   auto [to_group, _, id] = paramBlocks.get(tmp_state.baseHandleOffset, tmp_idx);
 
   new (to_group) wgpu::BindGroup(createBindGroup(init));
@@ -1592,7 +1629,7 @@ void Backend::createRasterPasses(
         .clearValue = cfg->depthAttachment.clearValue,
       };
     } else {
-      assert(cfg->depthAttachment.format == wgpu::TextureFormat::Undefined);
+      chk(cfg->depthAttachment.format == wgpu::TextureFormat::Undefined);
     }
 
     out->numColorAttachments = (i32)pass_init.colorAttachments.size();
@@ -1604,7 +1641,7 @@ void Backend::createRasterPasses(
 
       Texture tex_hdl = pass_init.colorAttachments[i];
       if (tex_hdl.gen == 0) {
-        assert(out->swapchainAttachmentIndex == -1);
+        chk(out->swapchainAttachmentIndex == -1);
         out->swapchainAttachmentIndex = i;
         out->swapchain = { tex_hdl.id };
       } else {
@@ -1670,7 +1707,7 @@ void Backend::createRasterShaders(i32 num_shaders,
         vertex_buffers;
 
     const i32 num_vertex_buffers = (i32)shader_init.vertexBuffers.size();
-    assert(num_vertex_buffers < MAX_VERTEX_BUFFERS_PER_SHADER);
+    chk(num_vertex_buffers < MAX_VERTEX_BUFFERS_PER_SHADER);
     for (i32 vbuf_idx = 0; vbuf_idx < num_vertex_buffers; vbuf_idx++) {
       const VertexBufferConfig &vbuf_cfg = shader_init.vertexBuffers[vbuf_idx];
       wgpu::VertexBufferLayout &out_layout = vertex_buffers[vbuf_idx];
@@ -1679,7 +1716,7 @@ void Backend::createRasterShaders(i32 num_shaders,
       
       wgpu::VertexAttribute *out_attrs = vertex_attributes[vbuf_idx].data();
       const i32 num_attrs = vbuf_cfg.attributes.size();
-      assert(num_attrs < MAX_VERTEX_ATTRIBUTES);
+      chk(num_attrs < MAX_VERTEX_ATTRIBUTES);
       for (i32 i = 0; i < num_attrs; i++) {
         VertexAttributeConfig attr_cfg = vbuf_cfg.attributes[i];
         out_attrs[i] = {
@@ -1721,7 +1758,7 @@ void Backend::createRasterShaders(i32 num_shaders,
       };
     }
 
-    assert(raster_cfg.blending.size() == 0 ||
+    chk(raster_cfg.blending.size() == 0 ||
       raster_cfg.blending.size() == pass_cfg->numColorAttachments);
 
     wgpu::BlendState blend_states[MAX_COLOR_ATTACHMENTS];
@@ -1934,13 +1971,13 @@ void Backend::destroySwapchain(Swapchain swapchain)
   i32 swapchain_idx = swapchain.id;
 
   BackendSwapchain &wgpu_swapchain = swapchains[swapchain.id];
-  assert(wgpu_swapchain.view == nullptr);
+  chk(wgpu_swapchain.view == nullptr);
 
   {
     textures.releaseResources(1, &wgpu_swapchain.reservedHandle,
       [](BackendTexture *to_hot, BackendTextureCold *to_cold)
     {
-      assert(to_hot->view == nullptr &&
+      chk(to_hot->view == nullptr &&
              to_cold->texture == nullptr);
 
       to_hot->~BackendTexture();
@@ -2026,8 +2063,8 @@ void Backend::waitUntilIdle()
   wgpu::Future future = queue.OnSubmittedWorkDone(
       wgpu::CallbackMode::WaitAnyOnly, workDoneCB);
 
-  wgpu::WaitStatus wait_status = busyWaitForFuture(inst, future);
-  if (wait_status != wgpu::WaitStatus::Success) {
+  WGPUWaitStatus wait_status = busyWaitForFuture(inst.Get(), future);
+  if (wait_status != WGPUWaitStatus_Success) {
     FATAL("WebGPU backend waitUntilIdle: error while waiting for work done callback: %lu", (u64)wait_status);
   }
 
@@ -2094,7 +2131,7 @@ GPUTmpMemBlock Backend::allocGPUTmpStagingBlock(GPUQueue queue_hdl)
 
     global_offset = range_end;
     u32 buf_idx = global_offset / NUM_BLOCKS_PER_TMP_BUFFER;
-    assert(buf_idx < MAX_TMP_BUFFERS_PER_QUEUE);
+    chk(buf_idx < MAX_TMP_BUFFERS_PER_QUEUE);
 
     i32 staging_belt_idx = allocStagingBufferFromBelt();
 
@@ -2164,7 +2201,7 @@ GPUTmpMemBlock Backend::allocGPUTmpInputBlock(GPUQueue queue_hdl)
 
     global_offset = range_end;
     u32 buf_idx = global_offset / NUM_BLOCKS_PER_TMP_BUFFER;
-    assert(buf_idx < MAX_TMP_BUFFERS_PER_QUEUE);
+    chk(buf_idx < MAX_TMP_BUFFERS_PER_QUEUE);
 
     i32 staging_belt_idx = allocStagingBufferFromBelt();
     state.gpuTmpInputStagingBuffers[buf_idx] = staging_belt_idx;
@@ -2672,7 +2709,7 @@ i32 Backend::allocStagingBufferFromBelt()
   }
 
   u32 idx = stagingBelt.numAllocated++;
-  assert(idx < MAX_TMP_STAGING_BUFFERS);
+  chk(idx < MAX_TMP_STAGING_BUFFERS);
 
   wgpu::BufferDescriptor buffer_desc {
     .usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc,
@@ -2762,7 +2799,7 @@ GPUTmpMemBlock Backend::allocTmpDynUniformBlock(BackendQueueData &queue_data)
 
     u32 new_global_offset = range_end;
     u32 buf_idx = new_global_offset / TmpGPUBuffer::NUM_BLOCKS;
-    assert(buf_idx < GPUTmpInputState::MAX_BUFFERS);
+    chk(buf_idx < GPUTmpInputState::MAX_BUFFERS);
 
     u32 new_buf_handle_idx = state.bufferHandlesBase + buf_idx;
     state.buffers[buf_idx] = allocTmpDynamicUniformBuffer(new_buf_handle_idx);
