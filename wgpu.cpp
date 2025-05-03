@@ -29,17 +29,17 @@ public:
   InitDeviceRequest(WebGPULib *lib, i32 device_idx,
                     Span<const Surface> surfaces,
                     void (*cb)(GPUDevice *, void *),
-                    void *cb_data,
-                    bool delete_when_done);
+                    void *cb_data);
 
   void busyWait();
+  void release();
 
 private:
   WebGPULib *lib_;
   i32 device_idx_;
   void (*cb_)(GPUDevice *, void *);
   void *cb_data_;
-  bool delete_when_done_;
+  int ref_count_;
 
   WGPUAdapter adapter_;
   WGPULimits limits_;
@@ -520,14 +520,13 @@ static WGPUWaitStatus busyWaitForFuture(WGPUInstance inst, WGPUFuture future)
 InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
                                      Span<const Surface> surfaces,
                                      void (*cb)(GPUDevice *, void *),
-                                     void *cb_data,
-                                     bool delete_when_done)
+                                     void *cb_data)
 {
   lib_ = lib;
   device_idx_ = device_idx;
   cb_ = cb;
   cb_data_ = cb_data;
-  delete_when_done_ = delete_when_done;
+  ref_count_ = 1;
 
   // Cannot select specific GPU in webgpu
   chk(device_idx_ == 0);
@@ -548,6 +547,7 @@ InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
     request->requestAdapterCB(status, adapter, err_msg);
   };
 
+  ref_count_++;
   adapter_future_ = wgpuInstanceRequestAdapter(
     lib->inst.Get(), &request_options, WGPURequestAdapterCallbackInfo {
       .nextInChain = nullptr,
@@ -571,6 +571,14 @@ void InitDeviceRequest::busyWait()
   }
 }
 
+void InitDeviceRequest::release()
+{
+  ref_count_--;
+  if (ref_count_ == 0) {
+    delete this;
+  }
+}
+
 void InitDeviceRequest::requestAdapterCB(
     WGPURequestAdapterStatus status, WGPUAdapter requested_adapter,
     WGPUStringView err_msg)
@@ -579,8 +587,9 @@ void InitDeviceRequest::requestAdapterCB(
     FATAL("Requesting adapter failed: %.*s", err_msg.length, err_msg.data);
   }
 
-  adapter_ = std::move(requested_adapter);
+  adapter_ = requested_adapter;
 
+  limits_.nextInChain = nullptr;
   WGPUStatus limits_status = wgpuAdapterGetLimits(adapter_, &limits_);
   if (limits_status != WGPUStatus_Success) {
     FATAL("Failed to get supported limits from adapter");
@@ -663,11 +672,12 @@ void InitDeviceRequest::requestDeviceCB(WGPURequestDeviceStatus status,
   Backend *backend = new Backend(
     adapter_, device, queue,
     lib_->inst, backend_limits, lib_->errorsAreFatal);
-  cb_(backend, cb_data_);
 
-  if (delete_when_done_) {
-    delete this;
-  }
+  auto cb = cb_;
+  void *cb_data = cb_data_;
+  release();
+
+  cb(backend, cb_data);
 }
 
 GPUDevice * WebGPULib::createDevice(
@@ -679,8 +689,9 @@ GPUDevice * WebGPULib::createDevice(
     *(GPUDevice **)out_ptr = dev;
   };
 
-  InitDeviceRequest request(this, gpu_idx, surfaces, cb, (void *)&out, false);
+  InitDeviceRequest request(this, gpu_idx, surfaces, cb, (void *)&out);
   request.busyWait();
+  // Don't call release here because the request is stack allocated
 
   return out;
 }
@@ -689,7 +700,8 @@ void WebGPULib::createDeviceAsync(
     i32 gpu_idx, Span<const Surface> surfaces,
     void (*cb)(GPUDevice *, void *), void *cb_data)
 {
-  new InitDeviceRequest(this, gpu_idx, surfaces, cb, cb_data, true);
+  auto *request = new InitDeviceRequest(this, gpu_idx, surfaces, cb, cb_data);
+  request->release();
 }
 
 void WebGPULib::destroyDevice(GPUDevice *gpu)
