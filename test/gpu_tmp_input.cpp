@@ -3,11 +3,13 @@
 namespace gas::test {
 namespace {
 
+using namespace brt;
+
 class GPUTmpInput : public GPUTest {
 protected:
   RasterShader setupFullScreenTestShader()
   {
-    auto backend_bytecode_type = gpuAPI->backendShaderByteCodeType();
+    auto backend_bytecode_type = gpuLib->backendShaderByteCodeType();
   
     StackAlloc shaderc_alloc;
     ShaderByteCode shader_bytecode;

@@ -5,7 +5,6 @@
 TEST(UI, ManySwapchains)
 {
   using namespace gas;
-  using namespace gas;
 
   UISystem *ui_sys = UISystem::init(UISystem::Config {
     .enableValidation = true,
@@ -21,7 +20,7 @@ TEST(UI, ManySwapchains)
 
   processEvents();
 
-  GPUAPI *gpu_api = ui_sys->gpuAPI();
+  GPULib *gpu_lib = ui_sys->gpuLib();
 
   constexpr i32 num_windows = 32;
   Window * windows[num_windows];
@@ -33,7 +32,7 @@ TEST(UI, ManySwapchains)
 
   processEvents();
 
-  GPURuntime *gpu = gpu_api->createRuntime(0, {windows[0]->surface});
+  GPUDevice *gpu = gpu_lib->createDevice(0, {windows[0]->surface});
 
   for (i32 i = 0; i < num_windows; i++) {
     SwapchainProperties swapchain_properties;
@@ -54,15 +53,11 @@ TEST(UI, ManySwapchains)
 
   for (i32 i = 0; i < num_windows; i++) {
     gpu->destroySwapchain(swapchains[i]);
-  }
-
-  gpu_api->destroyRuntime(gpu);
-
-  processEvents();
-
-  for (i32 i = 0; i < num_windows; i++) {
     ui_sys->destroyWindow(windows[i]);
   }
+
+  gpu_lib->destroyDevice(gpu);
+  processEvents();
 
   ui_sys->shutdown();
 }

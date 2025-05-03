@@ -1,23 +1,21 @@
 #include "test_gpu.hpp"
-#include "init.hpp"
 
 namespace gas::test {
 
 GlobalGPUTestState * GlobalGPUTestState::state = nullptr;
-GPUAPI * GPUTest::gpuAPI = nullptr;
-GPURuntime * GPUTest::gpu = nullptr;
+GPULib * GPUTest::gpuLib = nullptr;
+GPUDevice * GPUTest::gpu = nullptr;
 ShaderCompiler * GPUTest::shaderc = nullptr;
 
 void GPUTest::SetUpTestSuite()
 {
   GlobalGPUTestState *global_state = GlobalGPUTestState::state;
 
-  gpuAPI = InitSystem::initAPI(global_state->apiSelect, global_state->gpuLib,
-                               APIConfig {
+  gpuLib = GPULib::init(global_state->apiSelect, APIConfig {
     .enableValidation = true,
-    .runtimeErrorsAreFatal = true,
+    .errorsAreFatal = true,
   });
-  gpu = gpuAPI->createRuntime(global_state->gpuIDX);
+  gpu = gpuLib->createDevice(global_state->gpuIDX);
 
   shaderc = global_state->shadercLib.createCompiler();
 }
@@ -26,17 +24,17 @@ void GPUTest::TearDownTestSuite()
 {
   GlobalGPUTestState *global_state = GlobalGPUTestState::state;
   global_state->shadercLib.destroyCompiler(shaderc);
-  gpuAPI->destroyRuntime(gpu);
-  gpuAPI->shutdown();
+  gpuLib->destroyDevice(gpu);
+  gpuLib->shutdown();
 
   shaderc = nullptr;
   gpu = nullptr;
-  gpuAPI = nullptr;
+  gpuLib= nullptr;
 }
 
 class GPUEnvironment : public ::testing::Environment {
 public:
-  GPUEnvironment(GPUAPISelect api_select = InitSystem::autoSelectAPI(),
+  GPUEnvironment(GPUAPISelect api_select = GPULib::autoSelectAPI(),
                  i32 gpu_idx = 0)
     : apiSelect(api_select),
       gpuIDX(gpu_idx)
@@ -49,10 +47,10 @@ public:
   {
     GlobalGPUTestState::state = new GlobalGPUTestState {
       .apiSelect = apiSelect,
-      .gpuLib = InitSystem::loadAPILib(apiSelect),
       .gpuIDX = gpuIDX,
-      .shadercLib = InitSystem::loadShaderCompiler(),
+      .shadercLib = {},
     };
+    GlobalGPUTestState::state->shadercLib.load();
   }
 
   // Override this to define how to tear down the environment.
@@ -60,8 +58,7 @@ public:
   {
     GlobalGPUTestState *global_state = GlobalGPUTestState::state;
 
-    InitSystem::unloadShaderCompiler(global_state->shadercLib);
-    InitSystem::unloadAPILib(global_state->gpuLib);
+    global_state->shadercLib.unload();
 
     delete global_state;
     GlobalGPUTestState::state = nullptr;

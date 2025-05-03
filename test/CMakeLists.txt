@@ -5,7 +5,6 @@ cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH GAS_SRC_DIR )
 target_include_directories(gas_test_common INTERFACE ${GAS_SRC_DIR})
 target_link_libraries(gas_test_common INTERFACE
   gas_core
-  madrona_common
 )
 
 add_executable(gas_test_utils

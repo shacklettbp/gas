@@ -18,6 +18,5 @@ target_link_libraries(gas_example_renderer
     gas_core
     gas_ui
     gas_imgui
-    madrona_common
 )
 

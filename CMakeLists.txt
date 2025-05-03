@@ -9,10 +9,23 @@ if (NOT PROJECT_NAME)
     list(APPEND LANGS OBJC)
   endif()
 
+  option(GAS_BRT_EXTERNAL_DIR "" "")
+  if (NOT GAS_BRT_EXTERNAL_DIR)
+    message(FATAL_ERROR "GAS_BRT_EXTERNAL_DIR option must be set for standalone build")
+  endif()
+
+  include("${GAS_BRT_EXTERNAL_DIR}/cmake/toolchain.cmake")
+
   project(gas LANGUAGES ${LANGS})
 
-  include(sys-detect)
-  include(cxx-setup)
+  include("${GAS_BRT_EXTERNAL_DIR}/cmake/sys-detect.cmake")
+  include("${GAS_BRT_EXTERNAL_DIR}/cmake/cxx-setup.cmake")
+
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+  set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/pdb)
+
+  add_subdirectory("${GAS_BRT_EXTERNAL_DIR}" brt)
 endif()
 
 add_subdirectory(deps)

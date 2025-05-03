@@ -1,7 +1,5 @@
 #include "mem.hpp"
 
-#include <madrona/utils.hpp>
-
 #include <gtest/gtest.h>
 
 using namespace gas;

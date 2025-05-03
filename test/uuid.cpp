@@ -1,10 +1,11 @@
 #include "uuid.hpp"
 #include "backend_common.hpp"
 
-#include <madrona/rand.hpp>
+#include <brt/rand.hpp>
 
 #include <gtest/gtest.h>
 
+using namespace brt;
 using namespace gas;
 
 TEST(UUID, Parse)

@@ -17,11 +17,15 @@ void buildUI()
 
 int main(int argc, char *argv[])
 {
+  (void)argc;
+  (void)argv;
+
+  using namespace brt;
   using namespace gas;
 
   UISystem *ui_sys = UISystem::init(UISystem::Config {
     .enableValidation = true,
-    .runtimeErrorsAreFatal = true,
+    .errorsAreFatal = true,
   });
 
   {
@@ -31,12 +35,13 @@ int main(int argc, char *argv[])
     }
   }
 
-  GPUAPI *gpu_api = ui_sys->gpuAPI();
+  GPULib *gpu_lib = ui_sys->gpuLib();
 
   Window *window = ui_sys->createMainWindow("GAS Example", 1920, 1080);
   
-  ShaderCompilerLib shaderc_lib = InitSystem::loadShaderCompiler();
-  auto backend_bytecode_type = gpu_api->backendShaderByteCodeType();
+  ShaderCompilerLib shaderc_lib;
+  shaderc_lib.load();
+  auto backend_bytecode_type = gpu_lib->backendShaderByteCodeType();
 
   StackAlloc shaderc_alloc;
   ShaderByteCode shader_bytecode;
@@ -59,7 +64,7 @@ int main(int argc, char *argv[])
         compile_result.getByteCodeForBackend(backend_bytecode_type);
   }
 
-  GPURuntime *gpu = gpu_api->createRuntime(0, {window->surface});
+  GPUDevice *gpu = gpu_lib->createDevice(0, {window->surface});
 
   SwapchainProperties swapchain_properties;
   Swapchain swapchain = gpu->createSwapchain(
@@ -168,7 +173,7 @@ int main(int argc, char *argv[])
       raster_enc.drawData(Vector3 { 1, 0, 0 });
       raster_enc.draw(0, 1);
 
-      raster_enc.drawData(Vector3 { 1, sinf(math::toRadians(frame_num)), 0 });
+      raster_enc.drawData(Vector3 { 1, sinf(toRadians(frame_num)), 0 });
       raster_enc.draw(0, 1);
 
       enc.endRasterPass(raster_enc);
@@ -215,9 +220,9 @@ int main(int argc, char *argv[])
 
   gpu->destroySwapchain(swapchain);
 
-  gpu_api->destroyRuntime(gpu);
+  gpu_lib->destroyDevice(gpu);
 
-  InitSystem::unloadShaderCompiler(shaderc_lib);
+  shaderc_lib.unload();
 
   ui_sys->destroyMainWindow();
   ui_sys->shutdown();
