@@ -477,7 +477,6 @@ Surface WebGPULib::createSurface(void *os_data, i32 width, i32 height)
 
   wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas_desc {};
   canvas_desc.selector = selector;
-  printf("selector: %s\n", selector);
 
   wgpu::SurfaceDescriptor surface_desc {
     .nextInChain = &canvas_desc,
