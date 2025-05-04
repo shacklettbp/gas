@@ -1,5 +1,6 @@
 #include "gas_imgui.hpp"
 #include "shader_compiler.hpp"
+#include "gas_imgui_shaders.hpp"
 
 #include <brt/err.hpp>
 
@@ -26,46 +27,6 @@ struct ImGuiBackend {
   i32 fbWidth;
   i32 fbHeight;
 };
-
-RasterShader loadShader(GPUDevice *gpu,
-                        ShaderCompiler *shaderc,
-                        ParamBlockType param_block_type,
-                        RasterPassInterface raster_pass)
-{
-  StackAlloc alloc;
-  ShaderCompileResult compiled_shader = shaderc->compileShader(alloc, {
-    .path = GAS_IMGUI_SHADER_DIR "imgui.slang",
-  });
-
-  if (!compiled_shader.success) {
-    FATAL("Failed to compile gas imgui shader: %s\n",
-          compiled_shader.diagnostics);
-  }
-
-  using enum VertexFormat;
-  return gpu->createRasterShader({
-    .byteCode = compiled_shader.getByteCodeForBackend(
-        gpu->backendShaderByteCodeType()),
-    .vertexEntry = "vertMain",
-    .fragmentEntry = "fragMain",
-    .rasterPass = raster_pass,
-    .paramBlockTypes = { param_block_type },
-    .numPerDrawBytes = sizeof(VertexTransform),
-    .vertexBuffers = {{ 
-      .stride = sizeof(ImDrawVert), .attributes = {
-        { .offset = offsetof(ImDrawVert, pos), .format = Vec2_F32 },
-        { .offset = offsetof(ImDrawVert, uv),  .format = Vec2_F32 },
-        { .offset = offsetof(ImDrawVert, col), .format = Vec4_UNorm8 },
-      }
-    }},
-    .rasterConfig = {
-      .depthCompare = DepthCompare::Disabled,
-      .writeDepth = false,
-      .cullMode = CullMode::None,
-      .blending = { BlendingConfig::additiveDefault() },
-    },
-  });
-}
 
 void loadFonts(GPUDevice *gpu,
                GPUQueue tx_queue,
@@ -179,13 +140,14 @@ namespace ImGuiSystem {
 void init(UISystem *ui_sys,
           GPUDevice *gpu,
           GPUQueue tx_queue,
-          ShaderCompiler *shaderc,
           RasterPassInterface raster_pass_interface,
+          const char *shader_dir,
           const char *font_path,
           float font_size)
 {
   using enum ShaderStage;
   using enum SamplerAddressMode;
+  using enum VertexFormat;
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -214,8 +176,40 @@ void init(UISystem *ui_sys,
     },
   });
 
-  bd->shader = loadShader(
-      gpu, shaderc, bd->paramBlockType, raster_pass_interface);
+  StackAlloc alloc;
+  const char *imgui_shader_name = "gas_imgui_shaders.shader_blob";
+  char *shader_path = alloc.allocN<char>(strlen(shader_dir) + 1 + strlen(imgui_shader_name) + 1);
+  strcpy(shader_path, shader_dir);
+  strcat(shader_path, "/");
+  strcat(shader_path, imgui_shader_name);
+
+  ImGuiShaders imgui_shaders;
+  if (!imgui_shaders.load(alloc, shader_path)) {
+    FATAL("Failed to load imgui shaders: %s", shader_path);
+  }
+
+  bd->shader = gpu->createRasterShader({
+    .byteCode = imgui_shaders.getByteCode(ImGuiShaderID::Render),
+    .vertexEntry = "vertMain",
+    .fragmentEntry = "fragMain",
+    .rasterPass = raster_pass_interface,
+    .paramBlockTypes = { bd->paramBlockType },
+    .numPerDrawBytes = sizeof(VertexTransform),
+    .vertexBuffers = {{ 
+      .stride = sizeof(ImDrawVert), .attributes = {
+        { .offset = offsetof(ImDrawVert, pos), .format = Vec2_F32 },
+        { .offset = offsetof(ImDrawVert, uv),  .format = Vec2_F32 },
+        { .offset = offsetof(ImDrawVert, col), .format = Vec4_UNorm8 },
+      }
+    }},
+    .rasterConfig = {
+      .depthCompare = DepthCompare::Disabled,
+      .writeDepth = false,
+      .cullMode = CullMode::None,
+      .blending = { BlendingConfig::additiveDefault() },
+    },
+  });
+  alloc.release();
 
   bd->fontSampler = gpu->createSampler({
     .addressMode = Repeat,

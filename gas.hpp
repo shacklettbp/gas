@@ -6,6 +6,7 @@
 
 #include <brt/math.hpp>
 #include <brt/err.hpp>
+#include <brt/stack_alloc.hpp>
 
 namespace gas {
 
@@ -355,9 +356,9 @@ struct RasterPassInit {
 // Loading / compiling shader source code
 enum class ShaderByteCodeType : u32 {
   SPIRV,
+  WGSL,
   MTLLib,
   DXIL,
-  WGSL,
 };
 
 struct ShaderByteCode {
@@ -485,6 +486,14 @@ struct AcquireSwapchainResult {
 struct SwapchainProperties {
   TextureFormat format;
   bool supportsCopyDst;
+};
+
+struct CompiledShadersBlob {
+  u32 *metadata;
+  char *bytecodeBase;
+
+  bool load(brt::StackAlloc &alloc, const char *path);
+  inline ShaderByteCode getByteCode(u32 id) const;
 };
 
 constexpr inline u32 TABLE_FULL = 0xFFFF'FFFF;

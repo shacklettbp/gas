@@ -1,6 +1,7 @@
 #include "gas.hpp"
 #include "backend_common.hpp"
 
+#include "brt/utils.hpp"
 #include "wgpu_init.hpp"
 
 #include <brt/sync.hpp>
@@ -12,6 +13,8 @@
 #elif defined(BRT_OS_WINDOWS)
 #include "windows.hpp"
 #endif
+
+#include <fstream>
 
 namespace gas {
 
@@ -133,6 +136,27 @@ void ShaderCompilerLib::unload()
 #else
   FATAL("Shader compiler not supported");
 #endif
+}
+
+bool CompiledShadersBlob::load(brt::StackAlloc &alloc, const char *path)
+{
+  std::ifstream file(path, std::ios::binary);
+  if (!file.is_open()) {
+    return false;
+  }
+
+  file.seekg(0, std::ios::end);
+  u64 num_bytes = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  u32 *data = alloc.allocN<u32>(divideRoundUp(num_bytes, (u64)sizeof(u32)));
+  file.read((char *)data, num_bytes);
+
+  u32 num_shaders = data[0];
+  metadata = data + 1;
+  bytecodeBase = (char *)(metadata + num_shaders * 2);
+
+  return true;
 }
 
 ResourceUUIDMap::ResourceUUIDMap()

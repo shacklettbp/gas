@@ -701,6 +701,9 @@ void WebGPULib::createDeviceAsync(
     void (*cb)(GPUDevice *, void *), void *cb_data)
 {
   auto *request = new InitDeviceRequest(this, gpu_idx, surfaces, cb, cb_data);
+  // Unfortunately InitDeviceRequest has to be reference counted, because on
+  // native all the callbacks actually happen directly in the InitDeviceRequest constructor,
+  // while on web they're called later.
   request->release();
 }
 

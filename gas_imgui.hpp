@@ -9,8 +9,8 @@ namespace ImGuiSystem {
 void init(UISystem *ui_sys,
           GPUDevice *gpu,
           GPUQueue tx_queue,
-          ShaderCompiler *shaderc,
           RasterPassInterface raster_pass_interface,
+          const char *shader_dir,
           const char *font_path,
           float font_size);
 void shutdown(GPUDevice *gpu);

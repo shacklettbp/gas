@@ -46,6 +46,7 @@ struct ShaderCompileResult {
   ShaderByteCode wgsl;
 
   brt::Span<const char> diagnostics;
+  brt::Span<const char *> dependencies;
   bool success;
 
   inline ShaderByteCode getByteCodeForBackend(

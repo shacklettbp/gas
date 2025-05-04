@@ -90,6 +90,11 @@ inline BlendingConfig BlendingConfig::additiveDefault()
   };
 }
 
+inline ShaderByteCode CompiledShadersBlob::getByteCode(u32 id) const
+{
+  return { bytecodeBase + metadata[id * 2], metadata[id * 2 + 1] };
+}
+
 u32 * CommandWriter::reserve(GPUDevice *gpu)
 {
   if ((size_t)offset_ == cmds_->data.size()) [[unlikely]] {

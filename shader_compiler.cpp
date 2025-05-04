@@ -370,6 +370,7 @@ ShaderCompileResult CompilerBackend::compileShader(
   out.dxil = { nullptr, 0 };
   out.wgsl = { nullptr, 0 };
   out.diagnostics = copyOutDiagnostics(alloc, request->getDiagnosticOutput());
+  out.dependencies = { nullptr, 0 };
 
   if (!SLANG_SUCCEEDED(slang_result)) {
     out.success = false;
@@ -431,6 +432,19 @@ ShaderCompileResult CompilerBackend::compileShader(
       out.wgsl = { wgsl_out, num_wgsl_bytes - 1};
     }
   }
+
+  i32 num_deps = request->getDependencyFileCount();
+  const char **dep_files = alloc.allocN<const char *>(num_deps);
+  for (i32 i = 0; i < num_deps; i++) {
+    const char *dep_file = request->getDependencyFilePath(i);
+    i64 dep_file_len = strlen(dep_file);
+    char *dep_file_out = alloc.allocN<char>(dep_file_len + 1);
+    memcpy(dep_file_out, dep_file, dep_file_len + 1);
+    dep_file_out[dep_file_len] = '\0';
+    dep_files[i] = dep_file_out;
+  }
+
+  out.dependencies = { dep_files, num_deps };
 
   request->release();
 
