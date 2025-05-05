@@ -503,6 +503,11 @@ void WebGPULib::destroySurface(Surface surface)
 
 static WGPUWaitStatus busyWaitForFuture(WGPUInstance inst, WGPUFuture future)
 {
+#ifdef EMSCRIPTEN
+  (void)inst;
+  (void)future;
+  FATAL("Cannot busy wait on web");
+#else
   WGPUFutureWaitInfo wait_info {
     .future = future,
     .completed = false,
@@ -514,6 +519,7 @@ static WGPUWaitStatus busyWaitForFuture(WGPUInstance inst, WGPUFuture future)
   {}
 
   return wait_status;
+#endif
 }
 
 InitDeviceRequest::InitDeviceRequest(WebGPULib *lib, i32 device_idx,
@@ -1079,6 +1085,7 @@ Buffer Backend::createStagingBuffer(u32 num_bytes)
         (u64)wgpu::BufferUsage::MapWrite |
         (u64)wgpu::BufferUsage::CopySrc),
     .size = num_bytes,
+    .mappedAtCreation = true,
   };
 
   auto [to_hot, to_cold, id] = buffers.get(tbl_offset, 0);
@@ -1111,15 +1118,17 @@ void Backend::prepareStagingBuffers(i32 num_buffers,
       continue;
     }
 
-    // FIXME
-    auto map_cb = [](wgpu::MapAsyncStatus, char const *, void *) {};
+    if (to_buffer->GetMapState() == wgpu::BufferMapState::Unmapped) {
+      // FIXME
+      auto map_cb = [](wgpu::MapAsyncStatus, char const *, void *) {};
 
-    wgpu::Future map_future = to_buffer->MapAsync(
-        wgpu::MapMode::Write, 0, WGPU_WHOLE_MAP_SIZE,
-        wgpu::CallbackMode::WaitAnyOnly, map_cb, (void *)nullptr);
+      wgpu::Future map_future = to_buffer->MapAsync(
+          wgpu::MapMode::Write, 0, WGPU_WHOLE_MAP_SIZE,
+          wgpu::CallbackMode::WaitAnyOnly, map_cb, (void *)nullptr);
 
-    WGPUWaitStatus map_wait_status = busyWaitForFuture(inst.Get(), map_future);
-    chk(map_wait_status == WGPUWaitStatus_Success);
+      WGPUWaitStatus map_wait_status = busyWaitForFuture(inst.Get(), map_future);
+      chk(map_wait_status == WGPUWaitStatus_Success);
+    }
 
     mapped_out[buf_idx] = to_buffer->GetMappedRange();
   }
@@ -1519,7 +1528,7 @@ wgpu::BindGroup Backend::createBindGroup(ParamBlockInit init)
       .buffer = *to_buf,
       .offset = (u64)binding.offset,
       .size = binding.numBytes == 0xFFFF'FFFF ?
-        WGPU_WHOLE_MAP_SIZE : (u64)binding.numBytes,
+        WGPU_WHOLE_SIZE : (u64)binding.numBytes,
     };
 
     entry_idx += 1;
@@ -2043,7 +2052,9 @@ void Backend::presentSwapchainImage(Swapchain swapchain)
 {
   BackendSwapchain &wgpu_swapchain = swapchains[swapchain.id];
 
+#ifndef EMSCRIPTEN
   wgpu_swapchain.surface.Present();
+#endif
 
   wgpu_swapchain.view = nullptr;
 
