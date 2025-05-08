@@ -82,7 +82,7 @@ target_link_libraries(gas_imgui
   PUBLIC
     gas_imgui_hdrs
   PRIVATE
-    gas_core gas_ui gas_imgui_impl brt
+    gas_core gas_imgui_impl brt
 )
 
 gas_add_shaders(

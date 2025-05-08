@@ -16,8 +16,6 @@ struct VertexTransform {
 };
 
 struct ImGuiBackend {
-  UISystem *uiSys;
-
   ParamBlockType paramBlockType;
   RasterShader shader;
   Sampler fontSampler;
@@ -26,6 +24,8 @@ struct ImGuiBackend {
 
   i32 fbWidth;
   i32 fbHeight;
+
+  ImGuiSystem::UIControl *uiControl;
 };
 
 void loadFonts(GPUDevice *gpu,
@@ -137,8 +137,7 @@ ImGuiKey inputIDKeyToImGuiKey(InputID id)
 
 namespace ImGuiSystem {
 
-void init(UISystem *ui_sys,
-          GPUDevice *gpu,
+void init(GPUDevice *gpu,
           GPUQueue tx_queue,
           RasterPassInterface raster_pass_interface,
           const char *shader_dir,
@@ -164,7 +163,7 @@ void init(UISystem *ui_sys,
   io.BackendRendererName = "gas";
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-  bd->uiSys = ui_sys;
+  bd->uiControl = nullptr;
 
   bd->paramBlockType = gpu->createParamBlockType({
     .uuid = "imgui_param_block"_to_uuid,
@@ -178,7 +177,8 @@ void init(UISystem *ui_sys,
 
   StackAlloc alloc;
   const char *imgui_shader_name = "gas_imgui_shaders.shader_blob";
-  char *shader_path = alloc.allocN<char>(strlen(shader_dir) + 1 + strlen(imgui_shader_name) + 1);
+  char *shader_path = alloc.allocN<char>(
+      strlen(shader_dir) + 1 + strlen(imgui_shader_name) + 1);
   strcpy(shader_path, shader_dir);
   strcat(shader_path, "/");
   strcat(shader_path, imgui_shader_name);
@@ -238,13 +238,14 @@ void init(UISystem *ui_sys,
   {
     ImGuiIO &io = ImGui::GetIO();
     ImGuiBackend *bd = (ImGuiBackend *)io.BackendPlatformUserData;
-    UISystem *ui_sys = bd->uiSys;
+    UIControl *ui_ctrl = bd->uiControl;
 
     if (data->WantVisible) {
-      ui_sys->beginTextEntry(ui_sys->getMainWindow(),
-          { data->InputPos.x, data->InputPos.y }, data->InputLineHeight);
+      ui_ctrl->pos = { data->InputPos.x, data->InputPos.y };
+      ui_ctrl->lineHeight = data->InputLineHeight;
+      ui_ctrl->type = UIControl::Type(ui_ctrl->type | UIControl::EnableIME);
     } else {
-      ui_sys->endTextEntry(ui_sys->getMainWindow());
+      ui_ctrl->type = UIControl::Type(ui_ctrl->type | UIControl::DisableIME);
     }
   };
 }
@@ -274,26 +275,27 @@ void reloadFonts(GPUDevice *gpu,
   loadFonts(gpu, tx_queue, font_path, font_size);
 }
 
-void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
+void newFrame(UserInput &input, UserInputEvents &events,
+              u32 window_width, u32 window_height,
+              float ui_scale, float delta_t,
+              const char *input_text,
+              UIControl *out_ui_ctrl)
 {
   float pixels_to_ui = 1.f / ui_scale;
 
-  UserInput &cur_input = ui_sys->inputState();
-  UserInputEvents &events = ui_sys->inputEvents();
-  Window *window = ui_sys->getMainWindow();
-
   ImGuiIO &io = ImGui::GetIO();
   auto *bd = (ImGuiBackend *)io.BackendPlatformUserData;
-  bd->fbWidth = window->pixelWidth;
-  bd->fbHeight = window->pixelHeight;
+  bd->fbWidth = window_width;
+  bd->fbHeight = window_height;
+  bd->uiControl = out_ui_ctrl;
 
-  io.DisplaySize = ImVec2(window->pixelWidth * pixels_to_ui,
-                          window->pixelHeight * pixels_to_ui);
+  io.DisplaySize = ImVec2(window_width * pixels_to_ui,
+                          window_height * pixels_to_ui);
   io.DisplayFramebufferScale = ImVec2(ui_scale, ui_scale);
 
   io.DeltaTime = delta_t;
 
-  Vector2 mouse_pos = cur_input.mousePosition();
+  Vector2 mouse_pos = input.mousePosition();
 
   io.AddMousePosEvent(mouse_pos.x * pixels_to_ui,
                       mouse_pos.y * pixels_to_ui);
@@ -301,7 +303,7 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
   for (i32 i = 0; i < 5; i++) {
     InputID id = InputID((u32)InputID::MouseLeft + (u32)i);
 
-    if (cur_input.isDown(id)) {
+    if (input.isDown(id)) {
       if (events.upEvent(id)) {
         io.AddMouseButtonEvent(i, false);
         io.AddMouseButtonEvent(i, true);
@@ -317,16 +319,13 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
       }
     }
   }
-
-  io.AddFocusEvent((window->state & WindowState::IsFocused) != 
-                   WindowState::None);
 
   for (InputID id = InputID::A; id != InputID::NUM_IDS;
        id = InputID((u32)id + 1)) {
     ImGuiKey key = inputIDKeyToImGuiKey(id);
     assert(key != ImGuiKey_None);
 
-    if (cur_input.isDown(id)) {
+    if (input.isDown(id)) {
       if (events.upEvent(id)) {
         io.AddKeyEvent(key, false);
         io.AddKeyEvent(key, true);
@@ -343,8 +342,8 @@ void newFrame(UISystem *ui_sys, float ui_scale, float delta_t)
     }
   }
 
-  if (ui_sys->inputText()) {
-    io.AddInputCharactersUTF8(ui_sys->inputText());
+  if (input_text) {
+    io.AddInputCharactersUTF8(input_text);
   }
 
   ImGui::NewFrame();
