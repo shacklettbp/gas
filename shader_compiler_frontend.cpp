@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <sstream>
 
 using namespace brt;
 using namespace gas;
@@ -97,12 +98,6 @@ static void link(char *shader_enum,
   std::ofstream reload_info_out(reload_info_filename, std::ios::binary);
   if (!reload_info_out.is_open()) {
     fprintf(stderr, "Failed to open reload info output file: %s\n", reload_info_filename);
-    exit(EXIT_FAILURE);
-  }
-
-  std::ofstream hpp_out(hpp_out_filename, std::ios::binary);
-  if (!hpp_out.is_open()) {
-    fprintf(stderr, "Failed to open hpp output file: %s\n", hpp_out_filename);
     exit(EXIT_FAILURE);
   }
 
@@ -270,24 +265,61 @@ static void link(char *shader_enum,
     reload_info_out.write(shader_paths[i], strlen(shader_paths[i]) + 1);
   }
 
-  // Write header file with shader enum
-  hpp_out << "#pragma once\n";
-  hpp_out << "#include <gas/gas.hpp>\n\n";
+  // Write header file for C++ interface.
+  // We write to a string first and then check if the file has changed to
+  // avoid unnecessary C++ rebuilds
+  //
+  std::stringstream hpp_out_ss;
 
-  hpp_out << "namespace " << cpp_namespace << " {\n\n";
-  hpp_out << "enum class " << shader_enum << " : brt::u32 {\n";
+  hpp_out_ss << "#pragma once\n";
+  hpp_out_ss << "#include <gas/gas.hpp>\n\n";
+
+  hpp_out_ss << "namespace " << cpp_namespace << " {\n\n";
+  hpp_out_ss << "enum class " << shader_enum << " : brt::u32 {\n";
   for (u32 i = 0; i < num_shaders; i++) {
-    hpp_out << "  " << shader_names[i] << " = " << i << ",\n";
+    hpp_out_ss << "  " << shader_names[i] << " = " << i << ",\n";
   }
-  hpp_out << "};\n\n";
+  hpp_out_ss << "};\n\n";
 
-  hpp_out << "struct " << shader_class << " : gas::CompiledShadersBlob {\n";
-  hpp_out << "  inline gas::ShaderByteCode getByteCode(" << shader_enum << " id) const\n";
-  hpp_out << "  {\n";
-  hpp_out << "    return gas::CompiledShadersBlob::getByteCode((brt::u32)id);\n";
-  hpp_out << "  }\n";
-  hpp_out << "};\n\n";
-  hpp_out << "}\n";
+  hpp_out_ss << "struct " << shader_class << " : gas::CompiledShadersBlob {\n";
+  hpp_out_ss << "  inline gas::ShaderByteCode getByteCode(" << shader_enum << " id) const\n";
+  hpp_out_ss << "  {\n";
+  hpp_out_ss << "    return gas::CompiledShadersBlob::getByteCode((brt::u32)id);\n";
+  hpp_out_ss << "  }\n";
+  hpp_out_ss << "};\n\n";
+  hpp_out_ss << "}\n";
+
+  std::string new_hpp_out_contents = hpp_out_ss.str();
+
+  bool should_write_hpp = false;
+  {
+    std::ifstream hpp_in(hpp_out_filename, std::ios::binary);
+    if (!hpp_in.is_open()) {
+      should_write_hpp = true;
+    } else {
+      hpp_in.seekg(0, std::ios::end);
+      u64 num_bytes = hpp_in.tellg();
+      hpp_in.seekg(0, std::ios::beg);
+
+      std::vector<char> existing_header(num_bytes + 1);
+      hpp_in.read(existing_header.data(), num_bytes);
+      existing_header[num_bytes] = 0;
+
+      if (strcmp(new_hpp_out_contents.c_str(), existing_header.data())) {
+        should_write_hpp = true;
+      }
+    }
+  }
+
+  if (should_write_hpp) {
+    std::ofstream hpp_out(hpp_out_filename, std::ios::binary);
+    if (!hpp_out.is_open()) {
+      fprintf(stderr, "Failed to open hpp output file: %s\n", hpp_out_filename);
+      exit(EXIT_FAILURE);
+    }
+
+    hpp_out.write(new_hpp_out_contents.data(), new_hpp_out_contents.size());
+  }
 }
 
 int main(int argc, char *argv[])
