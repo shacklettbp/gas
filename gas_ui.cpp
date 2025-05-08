@@ -357,21 +357,6 @@ void UIBackend::destroyMainWindow()
   cleanupWindow(&mainWindow, gpuLib);
 }
 
-void UserInputEvents::merge(const UserInputEvents &o)
-{
-  for (i32 i = 0; i < (i32)events_.size(); i++) {
-    events_[i] |= o.events_[i];
-  }
-
-  mouse_scroll_ += o.mouse_scroll_;
-}
-
-void UserInputEvents::clear()
-{
-  zeroN<u32>(events_.data(), events_.size());
-  mouse_scroll_ = { 0, 0 };
-}
-
 void UIBackend::enableRawMouseInput(Window *window_base)
 {
   PlatformWindow *window = (PlatformWindow *)window_base;
@@ -432,36 +417,7 @@ bool UIBackend::processEvents()
   bool should_quit = false;
 
   inputEvents.clear();
-  inputState.mouse_delta_ = { 0, 0 };
   inputText = nullptr;
-
-  auto updateInputEvent =
-    [this]
-  (InputID id, bool down)
-  {
-    i32 event_idx = (i32)id / 16;
-    i32 event_bit = (i32)id % 16;
-
-    if (down) {
-      inputEvents.events_[event_idx] |= (1 << (2 * event_bit));
-    } else {
-      inputEvents.events_[event_idx] |= (1 << (2 * event_bit + 1));
-    }
-  };
-
-  auto updateInputState =
-    [this]
-  (InputID id, bool down)
-  {
-    i32 state_idx = (i32)id / 32;
-    i32 state_bit = (i32)id % 32;
-
-    if (down) {
-      inputState.states_[state_idx] |= (1 << state_bit);
-    } else {
-      inputState.states_[state_idx] &= ~(1 << state_bit);
-    }
-  };
 
 #ifdef GAS_USE_SDL
   auto getPlatformWindow =
@@ -573,26 +529,41 @@ bool UIBackend::processEvents()
             break;
           }
 
-          inputState.mouse_pos_ = { e.motion.x, e.motion.y };
-          inputState.mouse_delta_ = { e.motion.xrel, e.motion.yrel };
+          Vector2 new_mouse_pos { e.motion.x, e.motion.y };
+          Vector2 new_mouse_delta { e.motion.xrel, e.motion.yrel };
+
 #if defined(SDL_PLATFORM_MACOS) or defined(SDL_PLATFORM_LINUX)
           // macOS reports mouse in half pixel coords for hidpi displays
-          inputState.mouse_pos_ *= 2.f;
-          inputState.mouse_delta_ *= 2.f;
+          new_mouse_pos *= 2.f;
+          new_mouse_delta *= 2.f;
 #endif
+          inputState.setMousePosition(new_mouse_pos);
+          inputEvents.updateMouseDelta(new_mouse_delta);
         } break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
           InputID id = sdlMouseButtonToInputID(e.button.button);
-          updateInputState(id, e.button.down);
-          updateInputEvent(id, true);
+
+          if (e.button.down) {
+            inputState.setDown(id);
+          } else {
+            inputState.setUp(id);
+          }
+
+          inputEvents.recordDownEvent(id);
         } break;
         case SDL_EVENT_MOUSE_BUTTON_UP: {
           InputID id = sdlMouseButtonToInputID(e.button.button);
-          updateInputState(id, e.button.down);
-          updateInputEvent(id, false);
+
+          if (e.button.down) {
+            inputState.setDown(id);
+          } else {
+            inputState.setUp(id);
+          }
+
+          inputEvents.recordUpEvent(id);
         } break;
         case SDL_EVENT_MOUSE_WHEEL: {
-          inputEvents.mouse_scroll_ += { e.wheel.x, e.wheel.y };
+          inputEvents.updateMouseScroll({ e.wheel.x, e.wheel.y });
         } break;
         case SDL_EVENT_KEY_DOWN: {
           PlatformWindow *window = getPlatformWindow(e.key.windowID);
@@ -605,8 +576,13 @@ bool UIBackend::processEvents()
             break;
           }
 
-          updateInputState(id, e.key.down);
-          updateInputEvent(id, true);
+          if (e.key.down) {
+            inputState.setDown(id);
+          } else {
+            inputState.setUp(id);
+          }
+
+          inputEvents.recordDownEvent(id);
         } break;
         case SDL_EVENT_KEY_UP: {
           PlatformWindow *window = getPlatformWindow(e.key.windowID);
@@ -619,8 +595,13 @@ bool UIBackend::processEvents()
             break;
           }
 
-          updateInputState(id, e.key.down);
-          updateInputEvent(id, false);
+          if (e.key.down) {
+            inputState.setDown(id);
+          } else {
+            inputState.setUp(id);
+          }
+
+          inputEvents.recordUpEvent(id);
         } break;
         case SDL_EVENT_TEXT_INPUT: {
           if (!getPlatformWindow(e.text.windowID)) {

@@ -34,6 +34,7 @@ include(gas-find-deps)
 
 list(APPEND GAS_CORE_SOURCES
   gas.hpp gas.inl gas.cpp
+  gas_input.hpp gas_input.inl gas_input.cpp
   backend_common.hpp 
   mem.hpp mem.cpp
   linux.hpp windows.hpp

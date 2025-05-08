@@ -1,8 +1,7 @@
 #pragma once
 
-#include <memory>
-
 #include "gas.hpp"
+#include "gas_input.hpp"
 
 namespace gas {
 
@@ -26,54 +25,6 @@ struct Window {
   WindowState state;
 
   Surface surface;
-};
-
-enum class InputID : u32 {
-  MouseLeft, MouseRight, MouseMiddle, Mouse4, Mouse5,
-  A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
-  K1, K2, K3, K4, K5, K6, K7, K8, K9, K0,
-  Shift, Space, BackSpace, Esc, Enter,
-  NUM_IDS,
-};
-
-class UserInput {
-public:
-  inline brt::Vector2 mousePosition() const;
-  inline brt::Vector2 mouseDelta() const;
-
-  inline bool isDown(InputID id) const;
-  inline bool isUp(InputID id) const;
-
-private:
-  static constexpr inline u32 NUM_BITFIELDS =
-      brt::roundToAlignment((u32)InputID::NUM_IDS, 32_u32);
-
-  brt::Vector2 mouse_pos_;
-  brt::Vector2 mouse_delta_;
-
-  std::array<u32, NUM_BITFIELDS> states_;
-
-friend struct UIBackend;
-};
-
-class UserInputEvents {
-public:
-  inline bool downEvent(InputID id) const;
-  inline bool upEvent(InputID id) const;
-
-  void merge(const UserInputEvents &o);
-  void clear();
-
-  inline brt::Vector2 mouseScroll() const;
-
-private:
-  static constexpr inline u32 NUM_BITFIELDS =
-      2 * brt::roundToAlignment((u32)InputID::NUM_IDS, 32_u32);
-
-  std::array<u32, NUM_BITFIELDS> events_;
-  brt::Vector2 mouse_scroll_;
-
-friend struct UIBackend;
 };
 
 class UISystem {
