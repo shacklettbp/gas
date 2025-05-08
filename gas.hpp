@@ -290,7 +290,7 @@ struct SamplerBindingConfig {
   SamplerBindingType type = SamplerBindingType::Filtering;
   i32 bindLocation = -1;
   ShaderStage shaderUsage =
-    ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute;
+    ShaderStage::Fragment | ShaderStage::Compute;
   u16 numSamplers = 1;
 };
 
