@@ -756,15 +756,18 @@ private:
 
 class BackendCommon : public GPUDevice {
 public:
-  BackendCommon(bool errors_are_fatal);
+  BackendCommon(GPUFeatures supported_features,
+                bool errors_are_fatal);
 
   ResourceUUIDMap paramBlockTypeIDs;
   ResourceUUIDMap rasterPassInterfaceIDs;
 
-  void reportError(ErrorStatus error);
+  GPUFeatures supportedFeatures;
 
   u32 errorStatus;
   bool errorsAreFatal;
+
+  void reportError(ErrorStatus error);
 };
 
 

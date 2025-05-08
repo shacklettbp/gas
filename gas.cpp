@@ -287,6 +287,12 @@ ResourceUUIDMap::Hash ResourceUUIDMap::hash(UUID uuid)
   };
 }
 
+GPUFeatures GPUDevice::getSupportedFeatures()
+{
+  auto *backend_common = static_cast<BackendCommon *>(this);
+  return backend_common->supportedFeatures;
+}
+
 ErrorStatus GPUDevice::currentErrorStatus()
 {
   auto *backend_common = static_cast<BackendCommon *>(this);
@@ -311,10 +317,12 @@ void GPUDevice::deallocCommandBlocks(FrontendCommands *cmds)
   }
 }
 
-BackendCommon::BackendCommon(bool errors_are_fatal)
+BackendCommon::BackendCommon(GPUFeatures supported_features,
+                             bool errors_are_fatal)
   : GPUDevice(),
     paramBlockTypeIDs(),
     rasterPassInterfaceIDs(),
+    supportedFeatures(supported_features),
     errorStatus((u32)ErrorStatus::None),
     errorsAreFatal(errors_are_fatal)
 {}

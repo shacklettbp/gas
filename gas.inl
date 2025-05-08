@@ -853,6 +853,32 @@ void GPUDevice::submit(GPUQueue queue, CommandEncoder &enc)
   submit(queue, enc.cmds_head_);
 }
 
+inline GPUFeatures & operator|=(GPUFeatures &a, GPUFeatures b)
+{
+    a = GPUFeatures(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+    return a;
+}
+
+inline GPUFeatures operator|(GPUFeatures a, GPUFeatures b)
+{
+    a |= b;
+
+    return a;
+}
+
+inline GPUFeatures & operator&=(GPUFeatures &a, GPUFeatures b)
+{
+    a = GPUFeatures(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+    return a;
+}
+
+inline GPUFeatures operator&(GPUFeatures a, GPUFeatures b)
+{
+    a &= b;
+
+    return a;
+}
+
 inline BufferUsage & operator|=(BufferUsage &a, BufferUsage b)
 {
     a = BufferUsage(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));

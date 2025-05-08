@@ -246,6 +246,7 @@ public:
                  wgpu::Queue &&queue,
                  wgpu::Instance &inst,
                  BackendLimits &limits,
+                 GPUFeatures supported_features,
                  bool errors_are_fatal);
 
   inline void destroy();

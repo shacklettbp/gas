@@ -121,6 +121,15 @@ enum class ErrorStatus : u32 {
   NullBuffer  = 1 << 2,
 };
 
+enum class GPUFeatures : u32 {
+  None                    = 0,
+  RenderableRG11B10_Float = 1 << 0,
+};
+inline GPUFeatures & operator|=(GPUFeatures &a, GPUFeatures b);
+inline GPUFeatures operator|(GPUFeatures a, GPUFeatures b);
+inline GPUFeatures & operator&=(GPUFeatures &a, GPUFeatures b);
+inline GPUFeatures operator&(GPUFeatures a, GPUFeatures b);
+
 // Buffer setup
 enum class BufferUsage : u16 {
   CopySrc       = 1 << 0,
@@ -148,6 +157,8 @@ enum class TextureFormat : u16 {
   RGBA8_SRGB,
   BGRA8_UNorm,
   BGRA8_SRGB,
+  RG11B10_Float,
+  RGBA16_Float,
   Depth32_Float,
 };
 
@@ -916,6 +927,7 @@ public:
 
   virtual ShaderByteCodeType backendShaderByteCodeType() = 0;
 
+  GPUFeatures getSupportedFeatures();
   ErrorStatus currentErrorStatus();
 
 protected:

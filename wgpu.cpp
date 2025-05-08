@@ -43,6 +43,7 @@ private:
 
   WGPUAdapter adapter_;
   WGPULimits limits_;
+  GPUFeatures supported_features_;
 
   WGPUFuture adapter_future_;
   WGPUFuture device_future_;
@@ -122,6 +123,8 @@ inline wgpu::TextureFormat convertTextureFormat(TextureFormat in)
     case BGRA8_UNorm: return O::BGRA8Unorm;
     case BGRA8_SRGB: return O::BGRA8UnormSrgb;
     case Depth32_Float: return O::Depth32Float;
+    case RG11B10_Float: return O::RG11B10Ufloat;
+    case RGBA16_Float: return O::RGBA16Float;
     default: BRT_UNREACHABLE();
   }
 }
@@ -603,8 +606,31 @@ void InitDeviceRequest::requestAdapterCB(
     limits_.maxUniformBufferBindingSize = 65536;
   }
 
+  supported_features_ = GPUFeatures::None;
+  WGPUSupportedFeatures features;
+  wgpuAdapterGetFeatures(adapter_, &features);
+  for (size_t i = 0; i < features.featureCount; i++) {
+    WGPUFeatureName feature = features.features[i];
+    switch (feature) {
+      case WGPUFeatureName_RG11B10UfloatRenderable: {
+        supported_features_ |= GPUFeatures::RenderableRG11B10_Float;
+      } break;
+      default: break;
+    }
+  }
+  wgpuSupportedFeaturesFreeMembers(features);
+
   WGPUDeviceDescriptor dev_desc {};
   dev_desc.requiredLimits = &limits_;
+
+  auto required_features = std::to_array<WGPUFeatureName>({
+    WGPUFeatureName_RG11B10UfloatRenderable,
+  });
+  if ((supported_features_ & GPUFeatures::RenderableRG11B10_Float) !=
+      GPUFeatures::None) {
+    dev_desc.requiredFeatureCount = required_features.size();
+    dev_desc.requiredFeatures = required_features.data();
+  }
 
 #ifndef EMSCRIPTEN
   WGPUDawnTogglesDescriptor dev_toggles_desc {};
@@ -674,9 +700,8 @@ void InitDeviceRequest::requestDeviceCB(WGPURequestDeviceStatus status,
     .maxNumUniformBytes = (u32)limits_.maxUniformBufferBindingSize ,
   };
 
-  Backend *backend = new Backend(
-    adapter_, device, queue,
-    lib_->inst, backend_limits, lib_->errorsAreFatal);
+  Backend *backend = new Backend(adapter_, device, queue,
+    lib_->inst, backend_limits, supported_features_, lib_->errorsAreFatal);
 
   auto cb = cb_;
   void *cb_data = cb_data_;
@@ -737,8 +762,9 @@ Backend::Backend(wgpu::Adapter &&adapter_in,
                  wgpu::Queue &&queue_in,
                  wgpu::Instance &inst_in,
                  BackendLimits &limits_in,
+                 GPUFeatures supported_features,
                  bool errors_are_fatal)
-  : BackendCommon(errors_are_fatal),
+  : BackendCommon(supported_features, errors_are_fatal),
     adapter(std::move(adapter_in)),
     dev(std::move(dev_in)),
     queue(std::move(queue_in)),
